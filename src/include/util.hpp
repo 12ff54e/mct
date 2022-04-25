@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <type_traits>
 
+#include "Vec.hpp"
+
 namespace util {
 
 /**
@@ -142,19 +144,14 @@ Tx cubic_interpolation(const Tx& a,
  * @param a left staring point
  * @param b right starting point
  */
-template <typename Func, typename Tx>
-Tx find_root(const Func& func, const Tx& ax, const Tx& bx) {
+template <typename Func, typename TolFunc, typename Tx>
+Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
     using Tf = typename std::result_of<Func(Tx)>::type;
     // control parameters
 
     const unsigned max_iter = 50;
     unsigned count = max_iter;
     static const Tf mu = 0.5f;
-    auto tol = [](const Tx& x, const Tx& y) {
-        return util::abs(x - y) <=
-               std::min(util::abs(x), util::abs(y)) *
-                   std::sqrt(std::numeric_limits<Tf>::epsilon());
-    };
 
     if (ax >= bx) { throw std::domain_error("Given interval do not exist."); }
 
@@ -240,8 +237,218 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx) {
     }
 
 #ifdef _DEBUG
-    std::cout << "Iterate " << max_iter - count << " times.\n";
+    std::cout << "[DEBUG] Iterate " << max_iter - count << " times.\n";
 #endif
     return fb == 0 ? b : a;
 }
+
+template <typename Func, typename Tx>
+Tx find_root(const Func& func, const Tx& ax, const Tx& bx) {
+    return find_root(func, ax, bx, [](Tx a, Tx b) {
+        return std::abs(a - b) < Tx{4} * std::numeric_limits<Tx>::epsilon() *
+                                     std::min(std::abs(a), std::abs(b));
+    });
+}
+
+/**
+ * @brief Find root of $func(v) = field_val$ over vector by searching segment
+ * between two given points
+ *
+ * @param func
+ * @param v1
+ * @param v2
+ * @param field_val
+ */
+template <typename Func, unsigned D, typename T>
+Vec<D, T> vec_field_find_root(const Func& func,
+                              const Vec<D, T>& v1,
+                              const Vec<D, T>& v2,
+                              T field_val = T{}) {
+    T w = find_root(
+        [&](T w) { return func((T{1} - w) * v1 + w * v2) - field_val; }, T{},
+        T{1});
+    return (T{1} - w) * v1 + w * v2;
+}
+
+namespace detail {
+
+/**
+ * @brief The storage for abscissa and weight of order N Gauss-Kronrod
+ * integration method. The data for N=5, 15 is precomputed.
+ *
+ * @tparam N
+ */
+template <size_t N>
+struct gauss_kronrod_detail {
+    constexpr static std::array<double, (N + 1) / 2> abscissa();
+    constexpr static std::array<double, ((N - 1) / 2 + 1) / 2> gauss_weight();
+    constexpr static std::array<double, (N + 1) / 2> kronrod_weight();
+};
+
+template <>
+struct gauss_kronrod_detail<5> {
+    constexpr static std::array<double, 3> abscissa() {
+        return {0., 0.57735026918962576, 0.92582009977255146};
+    }
+
+    constexpr static std::array<double, 1> gauss_weight() { return {1.}; }
+
+    constexpr static std::array<double, 3> kronrod_weight() {
+        return {
+            0.62222222222222222,
+            0.49090909090909091,
+            0.19797979797979798,
+        };
+    }
+};
+
+template <>
+struct gauss_kronrod_detail<15> {
+    constexpr static std::array<double, 8> abscissa() {
+        return {
+            0.,
+            0.20778495500789847,
+            0.40584515137739717,
+            0.58608723546769113,
+            0.74153118559939444,
+            0.86486442335976907,
+            0.94910791234275852,
+            0.99145537112081264,
+        };
+    };
+    constexpr static std::array<double, 4> gauss_weight() {
+        return {
+            0.41795918367346939,
+            0.38183005050511894,
+            0.27970539148927667,
+            0.12948496616886969,
+        };
+    }
+    constexpr static std::array<double, 8> kronrod_weight() {
+        return {
+            2.09482141084727828e-01, 2.04432940075298892e-01,
+            1.90350578064785410e-01, 1.69004726639267903e-01,
+            1.40653259715525919e-01, 1.04790010322250184e-01,
+            6.30920926299785533e-02, 2.29353220105292250e-02,
+        };
+    }
+};
+
+/**
+ * @brief Order N Gauss-Kronrod quadrature, with embedded Gauss quadrature order
+ * = (N-1)/2
+ *
+ * @tparam N
+ * @tparam Tx
+ */
+template <size_t N, typename Tx>
+struct gauss_kronrod : gauss_kronrod_detail<N> {
+    using base = gauss_kronrod_detail<N>;
+
+    /**
+     * @brief Core function of gauss-kronrod integrate method, it integrates the
+     * given function on [-1, 1].
+     *
+     * @tparam Func Function type
+     * @tparam Tx Abscissa type
+     * @param func Integrand
+     * @return a pair of integral and err
+     */
+    template <typename Func>
+    auto static gauss_kronrod_basic(const Func& func)
+        -> std::pair<decltype(std::declval<Func>()(std::declval<Tx>())), Tx> {
+        auto f0 = func(Tx{});
+        using Ty = decltype(f0);
+        constexpr auto gauss_order = (N - 1) / 2;
+
+        Ty gauss_integral =
+            gauss_order & 1 ? base::gauss_weight()[0] * f0 : Ty{};
+        Ty kronrod_integral = base::kronrod_weight()[0] * f0;
+
+        for (size_t i = 1; i < base::abscissa().size(); ++i) {
+            gauss_integral +=
+                (gauss_order - i) & 1
+                    ? base::gauss_weight()[i / 2] * (func(base::abscissa()[i]) +
+                                                     func(-base::abscissa()[i]))
+                    : Ty{};
+            kronrod_integral +=
+                base::kronrod_weight()[i] *
+                (func(base::abscissa()[i]) + func(-base::abscissa()[i]));
+        }
+
+        return std::make_pair(
+            kronrod_integral,
+            std::max(
+                static_cast<Tx>(std::abs(kronrod_integral - gauss_integral)),
+                static_cast<Tx>(std::abs(kronrod_integral) *
+                                std::numeric_limits<Tx>::epsilon() * 2)));
+    }
+
+    template <typename Func>
+    auto static gauss_kronrod_adaptive(const Func& func,
+                                       Tx a,
+                                       Tx b,
+                                       size_t max_subdivide,
+                                       Tx local_abs_tol,
+                                       Tx global_rel_tol)
+        -> decltype(std::declval<Func>()(std::declval<Tx>())) {
+        const Tx mid = (b + a) / 2;
+        const Tx scale = (b - a) / 2;
+        auto normalize_func = [&](Tx x) { return func(scale * x + mid); };
+
+        auto result = gauss_kronrod_basic(normalize_func);
+        auto integral = result.first * scale;
+        auto err = result.second * scale;
+        if (local_abs_tol == 0) { local_abs_tol = global_rel_tol * integral; }
+
+        if (max_subdivide > 0 && err > local_abs_tol &&
+            err > global_rel_tol * integral) {
+            return gauss_kronrod_adaptive(func, a, mid, max_subdivide - 1,
+                                          local_abs_tol / 2, global_rel_tol) +
+                   gauss_kronrod_adaptive(func, mid, b, max_subdivide - 1,
+                                          local_abs_tol / 2, global_rel_tol);
+        }
+
+#ifdef _DEBUG
+        std::cout << "[DEBUG] Gauss-Kronrod subdivide stopped at [" << a << ", "
+                  << b << "] with max_subdivide = " << max_subdivide
+                  << ", err = " << err << '\n';
+#endif
+
+        return integral;
+    }
+};
+
+}  // namespace detail
+
+template <typename Func, typename Tx>
+auto integrate(const Func& func,
+               Tx a,
+               Tx b,
+               Tx tol = std::sqrt(std::numeric_limits<Tx>::epsilon()),
+               size_t max_subdivide = 15)
+    -> decltype(std::declval<Func>()(std::declval<Tx>())) {
+    using impl = detail::gauss_kronrod<15, Tx>;
+
+    return impl::gauss_kronrod_adaptive(func, a, b, max_subdivide, Tx{}, tol);
+}
+
+template <typename Func, typename Tx>
+auto integrate_coarse(const Func& func,
+                      Tx a,
+                      Tx b,
+                      Tx tol = std::sqrt(std::numeric_limits<Tx>::epsilon()),
+                      size_t max_subdivide = 3)
+    -> decltype(std::declval<Func>()(std::declval<Tx>())) {
+    using impl = detail::gauss_kronrod<5, Tx>;
+
+    return impl::gauss_kronrod_adaptive(func, a, b, max_subdivide, Tx{}, tol);
+}
+
+template <typename T>
+inline T arctan(T x, T y) {
+    T atan = std::atan2(x, y);
+    return atan < 0 ? static_cast<T>(2 * M_PIl + atan) : atan;
+}
+
 }  // namespace util
