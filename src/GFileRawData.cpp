@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <iostream>
 
 #include "include/GFileRawData.hpp"
+#include "include/util.hpp"
 
 bool GFileRawData::is_complete() const noexcept {
     return __complete;
@@ -78,8 +80,8 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     }
     // flux
     g.flux.resize({g.nw, g.nh});
-    for (unsigned i = 0; i < g.nw; ++i) {
-        for (unsigned j = 0; j < g.nh; ++j) { is >> g.flux(i, j); }
+    for (unsigned j = 0; j < g.nh; ++j) {
+        for (unsigned i = 0; i < g.nw; ++i) { is >> g.flux(i, j); }
     }
     if (is.fail()) {
         std::cout << "Data corruption at psirz.\n";
@@ -92,43 +94,29 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
         return is;
     }
     // # boundary point and # limiter point
-    is >> g.bd_num >> g.limiter_num;
+    is >> g.boundary_num >> g.limiter_num;
     if (is.fail()) {
         std::cout << "Data corruption at boundary number or limiter number.\n";
         return is;
     }
     // boundary points
-    std::vector<double> r_dum;
-    std::vector<double> z_dum;
-    read_vec(g.bd_num, r_dum);
-    read_vec(g.bd_num, z_dum);
-    for (unsigned i = 0; i < g.bd_num; ++i) {
-        g.boundary.emplace_back(r_dum[i], z_dum[i]);
+    for (unsigned i = 0; i < g.boundary_num; ++i) {
+        double rr, zz;
+        is >> rr >> zz;
+        g.boundary.emplace_back(rr, zz);
     }
     if (is.fail()) {
         std::cout << "Data corruption at boundary points.\n";
         return is;
     }
-    // calculate anchor points
-    unsigned r_min{}, r_max{}, z_min{}, z_max{};
-    for (unsigned i = 0; i < g.bd_num; ++i) {
-        r_min = r_dum[i] < r_dum[r_min] ? i : r_min;
-        r_max = r_dum[i] > r_dum[r_max] ? i : r_max;
-        z_min = z_dum[i] < z_dum[z_min] ? i : z_min;
-        z_max = z_dum[i] > z_dum[z_max] ? i : z_max;
-    }
-    g.right_anchor = g.boundary[r_max];
-    g.left_anchor = g.boundary[r_min];
-    g.top_anchor = g.boundary[z_max];
-    g.bottom_anchor = g.boundary[z_min];
+
+    g.rearrange_boundary();
 
     // limiter points
-    r_dum.clear();
-    z_dum.clear();
-    read_vec(g.limiter_num, r_dum);
-    read_vec(g.limiter_num, z_dum);
-    for (unsigned i = 0; i < g.bd_num; ++i) {
-        g.limiter.emplace_back(r_dum[i], z_dum[i]);
+    for (unsigned i = 0; i < g.limiter_num; ++i) {
+        double rr, zz;
+        is >> rr >> zz;
+        g.limiter.emplace_back(rr, zz);
     }
     if (is.fail()) {
         std::cout << "Data corruption at limiter points.\n";
@@ -138,4 +126,41 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     if (!is.fail()) { g.__complete = true; }
 
     return is;
+}
+
+void GFileRawData::rearrange_boundary() {
+    geometric_poloidal_angles.reserve(boundary_num);
+
+    size_t middle = 0;
+    for (size_t i = 0; i < boundary_num; ++i) {
+        geometric_poloidal_angles.push_back(
+            util::arctan(boundary[i] - magnetic_axis));
+
+        if (i > 0 && std::abs(geometric_poloidal_angles[i] -
+                              geometric_poloidal_angles[i - 1]) > M_PI) {
+            middle = i;
+        }
+    }
+
+    std::rotate(boundary.begin(), boundary.begin() + middle, boundary.end());
+    std::rotate(geometric_poloidal_angles.begin(),
+                geometric_poloidal_angles.begin() + middle,
+                geometric_poloidal_angles.end());
+
+    {
+        auto last = std::unique(geometric_poloidal_angles.begin(),
+                                geometric_poloidal_angles.end());
+        geometric_poloidal_angles.erase(last, geometric_poloidal_angles.end());
+    }
+    {
+        auto last = std::unique(boundary.begin(), boundary.end());
+        boundary.erase(last, boundary.end());
+    }
+
+    // make sure boundary points are sorted counterclockwise
+    if (geometric_poloidal_angles[0] > geometric_poloidal_angles[1]) {
+        std::reverse(boundary.begin(), boundary.end());
+        std::reverse(geometric_poloidal_angles.begin(),
+                     geometric_poloidal_angles.end());
+    }
 }

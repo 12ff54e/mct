@@ -1,0 +1,3 @@
+[submodule "lib/BSplineInterpolation"]
+	path = lib/BSplineInterpolation
+	url = https://github.com/12ff54e/BSplineInterpolation.git

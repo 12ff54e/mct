@@ -1,4 +1,7 @@
+#pragma once
+
 #include <array>
+#include <cmath>
 #include <type_traits>
 #include <utility>
 
@@ -34,11 +37,11 @@ class Vec_base {
     std::array<value_type, dim> coord;
 
    public:
-    Vec_base() = default;
+    constexpr Vec_base() = default;
 
     template <typename... Ts,
               typename = typename std::enable_if<sizeof...(Ts) == dim>::type>
-    Vec_base(Ts... vs) noexcept : coord{(value_type)vs...} {}
+    constexpr Vec_base(Ts... vs) noexcept : coord{(value_type)vs...} {}
 
     /**
      * @brief Conversion constructor from supported type
@@ -109,6 +112,22 @@ class Vec_base {
     }
     friend vec_type operator*(const T& scalar, vec_type vec) noexcept {
         return vec *= scalar;
+    }
+
+    // conversion operator
+
+    // convert to the underlying coordinate array
+    constexpr operator std::array<value_type, dim>() const { return coord; }
+
+    // convert to derived class
+    constexpr operator vec_type() { return static_cast<vec_type&&>(*this); }
+
+    // properties
+
+    T mag() const {
+        T norm{};
+        for (auto& c : coord) { norm += c * c; }
+        return std::sqrt(norm);
     }
 };
 

@@ -1,21 +1,42 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.12.0)
 project(mct VERSION 0.1.0)
+include(CTest)
 
-add_compile_options(-std=c++11)
-add_compile_options(-Wall)
-include_directories($ENV{HOME}/software/install/include)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE RelWithDebugInfo)
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(MSVC)
+    set(CMAKE_CXX_FLAGS "/W4 /EHsc")
+else()
+    set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+endif()
+
 include_directories(.)
+add_compile_definitions($<$<CONFIG:Debug>:_DEBUG>)
 
 # add_executable(mct main.cpp)
-add_executable(util_test test/util_test.cpp)
-add_executable(vec_test test/vec_test.cpp)
-add_executable(read_test test/read_test.cpp src/GFileRawData.cpp)
 
-include(CTest)
+list(APPEND src_files Contour.cpp GFileRawData.cpp)
+list(TRANSFORM src_files PREPEND src/)
+list(APPEND tests vec-test util-test read-test)
+
+list(LENGTH tests test_num)
+message(STATUS)
+message(STATUS  ${test_num} " tests found: ")
 enable_testing()
-add_test(util util_test)
-add_test(vec vec_test)
-add_test(read-gfile read_test)
+foreach(test ${tests})
+    string(JOIN "" test_src_file test/ ${test} .cpp)
+    add_executable(${test} ${test_src_file} ${src_files})
+
+    string(JOIN "-" test_name mct ${test})
+    add_test(${test_name} ${test})
+    message(STATUS ${test} " from source file " ${test_src_file})
+endforeach(test ${tests})
+message(STATUS)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})

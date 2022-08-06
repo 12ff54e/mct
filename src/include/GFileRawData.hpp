@@ -1,3 +1,5 @@
+#pragma once
+
 #include <fstream>
 #include <string>
 #include <vector>
@@ -54,7 +56,7 @@ struct GFileRawData {
     std::vector<double> safety_factor;
 
     // boundary point number
-    unsigned int bd_num;
+    unsigned int boundary_num;
     // limiter pointer number
     unsigned int limiter_num;
 
@@ -63,15 +65,9 @@ struct GFileRawData {
     // limiter point coordinates
     std::vector<Vec<2, double>> limiter;
 
-    // Following data are not read directly from gfile.
+    // extra data
 
-    // Anchor points of boundary sample points, might be slightly closer to
-    // center than that real boundary.
-
-    Vec<2, double> right_anchor;
-    Vec<2, double> left_anchor;
-    Vec<2, double> top_anchor;
-    Vec<2, double> bottom_anchor;
+    std::vector<double> geometric_poloidal_angles;
 
     // constructors
 
@@ -82,6 +78,12 @@ struct GFileRawData {
     // properties
 
     bool is_complete() const noexcept;
+
+    // post-process
+
+    void rearrange_boundary();
+
+    // operators
 
     friend std::ifstream& operator>>(std::ifstream&, GFileRawData&);
 

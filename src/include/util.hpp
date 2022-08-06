@@ -16,15 +16,27 @@ namespace util {
  * @return sign of val
  */
 template <typename Tf>
-int sgn(const Tf& val) {
+inline int sgn(const Tf& val) {
     return (Tf(0) < val) - (val < Tf(0));
 }
 
 template <typename T>
-T abs(T x) {
+inline T abs(T x) {
     return std::abs(x);
 }
 
+template <typename T>
+inline T arctan(T x, T y) {
+    T atan = std::atan2(y, x);
+    return atan < 0 ? static_cast<T>(2 * M_PIl + atan) : atan;
+}
+
+template <typename T>
+inline T arctan(const Vec<2, T>& pt) {
+    return arctan(pt.x(), pt.y());
+}
+
+// auxilary functions for find root
 namespace detail {
 
 template <typename Func, typename Tx, typename Tf>
@@ -270,6 +282,7 @@ Vec<D, T> vec_field_find_root(const Func& func,
     return (T{1} - w) * v1 + w * v2;
 }
 
+// auxiliary function for Gauss-Kronrod quadrature
 namespace detail {
 
 /**
@@ -366,14 +379,10 @@ struct gauss_kronrod : gauss_kronrod_detail<N> {
         Ty kronrod_integral = base::kronrod_weight()[0] * f0;
 
         for (size_t i = 1; i < base::abscissa().size(); ++i) {
+            Ty f = func(base::abscissa()[i]) + func(-base::abscissa()[i]);
             gauss_integral +=
-                (gauss_order - i) & 1
-                    ? base::gauss_weight()[i / 2] * (func(base::abscissa()[i]) +
-                                                     func(-base::abscissa()[i]))
-                    : Ty{};
-            kronrod_integral +=
-                base::kronrod_weight()[i] *
-                (func(base::abscissa()[i]) + func(-base::abscissa()[i]));
+                (gauss_order - i) & 1 ? base::gauss_weight()[i / 2] * f : Ty{};
+            kronrod_integral += base::kronrod_weight()[i] * f;
         }
 
         return std::make_pair(
@@ -443,12 +452,6 @@ auto integrate_coarse(const Func& func,
     using impl = detail::gauss_kronrod<5, Tx>;
 
     return impl::gauss_kronrod_adaptive(func, a, b, max_subdivide, Tx{}, tol);
-}
-
-template <typename T>
-inline T arctan(T x, T y) {
-    T atan = std::atan2(x, y);
-    return atan < 0 ? static_cast<T>(2 * M_PIl + atan) : atan;
 }
 
 }  // namespace util
