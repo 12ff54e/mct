@@ -12,7 +12,7 @@
  * @tparam D Dimension of the underlying space.
  * @tparam T Type of coordinate.
  */
-template <unsigned D, typename T>
+template <std::size_t D, typename T>
 class Vec_base;
 
 /**
@@ -21,15 +21,15 @@ class Vec_base;
  * @tparam D Dimension of the underlying space.
  * @tparam T Type of coordinate.
  */
-template <unsigned D, typename T>
+template <std::size_t D, typename T>
 class Vec;
 
-template <unsigned D, typename T>
+template <std::size_t D, typename T>
 class Vec_base {
     static_assert(D > 0, "D cannot be 0.");
 
    public:
-    static constexpr unsigned dim = D;
+    static constexpr std::size_t dim = D;
     using value_type = T;
     using vec_type = Vec<dim, value_type>;
 
@@ -53,7 +53,7 @@ class Vec_base {
               typename = typename std::enable_if<
                   std::is_convertible<U, T>::value>::type>
     Vec_base(Vec_base<dim, U> other) noexcept {
-        for (unsigned i = 0; i < dim; ++i) {
+        for (std::size_t i = 0; i < dim; ++i) {
             coord[i] = static_cast<value_type>(other[i]);
         }
     }
@@ -73,7 +73,7 @@ class Vec_base {
     // comparison operations
 
     bool operator==(const vec_type& rhs) const noexcept {
-        for (unsigned i = 0; i < dim; ++i) {
+        for (std::size_t i = 0; i < dim; ++i) {
             if (coord[i] != rhs[i]) { return false; }
         }
         return true;
@@ -85,16 +85,21 @@ class Vec_base {
     // arithmetic operations
 
     vec_type& operator+=(const vec_type& rhs) noexcept {
-        for (unsigned i = 0; i < dim; ++i) { coord[i] += rhs[i]; }
+        for (std::size_t i = 0; i < dim; ++i) { coord[i] += rhs[i]; }
         return *reinterpret_cast<vec_type*>(this);
     }
     vec_type& operator-=(const vec_type& rhs) noexcept {
-        for (unsigned i = 0; i < dim; ++i) { coord[i] -= rhs[i]; }
+        for (std::size_t i = 0; i < dim; ++i) { coord[i] -= rhs[i]; }
         return *reinterpret_cast<vec_type*>(this);
     }
 
     vec_type& operator*=(const T& scalar) noexcept {
-        for (unsigned i = 0; i < dim; ++i) { coord[i] *= scalar; }
+        for (std::size_t i = 0; i < dim; ++i) { coord[i] *= scalar; }
+        return *reinterpret_cast<vec_type*>(this);
+    }
+
+    vec_type& operator/=(const T& scalar) noexcept {
+        for (std::size_t i = 0; i < dim; ++i) { coord[i] /= scalar; }
         return *reinterpret_cast<vec_type*>(this);
     }
 
@@ -114,6 +119,10 @@ class Vec_base {
         return vec *= scalar;
     }
 
+    friend vec_type operator/(vec_type vec, const T& scalar) noexcept {
+        return vec /= scalar;
+    }
+
     // conversion operator
 
     // convert to the underlying coordinate array
@@ -124,14 +133,23 @@ class Vec_base {
 
     // properties
 
-    T mag() const {
+    T __L2_norm_square() const {
         T norm{};
         for (auto& c : coord) { norm += c * c; }
-        return std::sqrt(norm);
+        return norm;
     }
+
+    T mag() const { return std::sqrt(__L2_norm_square()); }
 };
 
-template <unsigned D, typename T>
+/**
+ * @brief Generic Vector type of any dimension, default to consisting double as
+ * coordinateds
+ *
+ * @tparam D Dimension
+ * @tparam T Underlying types of each dimension
+ */
+template <std::size_t D, typename T = double>
 class Vec : public Vec_base<D, T> {};
 
 template <typename T>
@@ -159,3 +177,22 @@ class Vec<3, T> : public Vec_base<3, T> {
     const T& y() const noexcept { return this->coord[1]; }
     const T& z() const noexcept { return this->coord[2]; }
 };
+
+template <typename T = double>
+Vec<2, T> cross(const Vec<2, T>& vec) {
+    return Vec<2, T>{-vec.y(), vec.x()};
+}
+
+template <typename T = double>
+Vec<3, T> cross(const Vec<3, T>& v1, const Vec<3, T>& v2) {
+    return Vec<3, T>{v1.y() * v2.z() - v1.z() * v2.y(),
+                     v1.z() * v2.x() - v1.x() * v2.z(),
+                     v1.x() * v2.y() - v1.y() * v2.x()};
+}
+
+template <std::size_t D, typename T = double>
+T dot(const Vec<D, T>& v1, const Vec<D, T>& v2) {
+    T p = 0;
+    for (std::size_t i = 0; i < D; ++i) { p += v1[i] * v2[i]; }
+    return p;
+}

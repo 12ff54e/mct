@@ -5,37 +5,37 @@
 #include "../src/include/GFileRawData.hpp"
 #include "Assertion.hpp"
 
-int main(int argc, char const* argv[]) {
+int main() {
     using namespace std::chrono;
     Assertion assertion;
 
     auto t_start = high_resolution_clock::now();
 
-    std::ifstream g_file;
-    g_file.open("../data/gfile-cfetr5.7-baseline-129", std::ios::in);
-    if (!g_file.is_open()) {
+    std::ifstream gfile;
+    gfile.open("../data/gfile-cfetr5.7-baseline-129", std::ios::in);
+    if (!gfile.is_open()) {
         assertion(false, "Can not open g-file.");
         return assertion.status();
     }
 
-    GFileRawData g_file_data;
-    g_file >> g_file_data;
-    assertion(g_file_data.is_complete(), "Parse g-file failed.");
+    GFileRawData gfile_data;
+    gfile >> gfile_data;
+    assertion(gfile_data.is_complete(), "Parse g-file failed.");
     if (assertion.last_status()) { return assertion.status(); }
 
     auto t_after_read_file = high_resolution_clock::now();
 
     intp::InterpolationFunction<double, 2u> flux_function(
-        3, g_file_data.flux,
-        std::make_pair(g_file_data.r_center - .5 * g_file_data.dim.x(),
-                       g_file_data.r_center + .5 * g_file_data.dim.x()),
-        std::make_pair(g_file_data.z_mid - .5 * g_file_data.dim.y(),
-                       g_file_data.z_mid + .5 * g_file_data.dim.y()));
+        3, gfile_data.flux,
+        std::make_pair(gfile_data.r_center - .5 * gfile_data.dim.x(),
+                       gfile_data.r_center + .5 * gfile_data.dim.x()),
+        std::make_pair(gfile_data.z_mid - .5 * gfile_data.dim.y(),
+                       gfile_data.z_mid + .5 * gfile_data.dim.y()));
 
     auto t_after_psi_mesh = high_resolution_clock::now();
 
-    double psi = .5 * (g_file_data.flux_magnetic_axis + g_file_data.flux_LCFS);
-    Contour middle_contour(psi, flux_function, g_file_data);
+    double psi = .5 * (gfile_data.flux_magnetic_axis + gfile_data.flux_LCFS);
+    Contour middle_contour(psi, flux_function, gfile_data);
 
     auto t_after_middle_contour_construction = high_resolution_clock::now();
 
@@ -60,7 +60,7 @@ int main(int argc, char const* argv[]) {
     // the same for any convex contour around magnetic axis.
     auto one_minus_cos = middle_contour.indefinite_integrate_along(
         [&](Vec<2, double> pt) {
-            return std::sin(util::arctan(pt - g_file_data.magnetic_axis));
+            return std::sin(util::arctan(pt - gfile_data.magnetic_axis));
         },
         false);
 

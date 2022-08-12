@@ -15,7 +15,7 @@ bool approx_eq(T a, T b) {
                                   std::min(std::abs(a), std::abs(b));
 }
 
-int main(int argc, char const* argv[]) {
+int main() {
     Assertion assertion;
 
     long double sqrt2 =

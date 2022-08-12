@@ -8,16 +8,16 @@
  *
  * @param psi
  * @param flux
- * @param g_file
+ * @param gfile
  */
 Contour::Contour(double psi,
                  const intp::InterpolationFunction<double, 2>& flux,
-                 const GFileRawData& g_file)
-    : g_file(g_file) {
-    pts.reserve(g_file.boundary.size());
-    for (size_t i = 0; i < g_file.boundary.size(); ++i) {
-        pts.emplace_back(util::vec_field_find_root(flux, g_file.magnetic_axis,
-                                                   g_file.boundary[i], psi));
+                 const GFileRawData& gfile)
+    : gfile(gfile) {
+    pts.reserve(gfile.boundary.size());
+    for (size_t i = 0; i < gfile.boundary.size(); ++i) {
+        pts.emplace_back(util::vec_field_find_root(flux, gfile.magnetic_axis,
+                                                   gfile.boundary[i], psi));
     }
 }
 

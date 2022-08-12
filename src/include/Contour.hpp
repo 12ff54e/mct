@@ -15,7 +15,7 @@ class Contour {
 
    private:
     std::vector<pt_type> pts;
-    const GFileRawData& g_file;
+    const GFileRawData& gfile;
 
    public:
     Contour(double,
@@ -36,7 +36,7 @@ class Contour {
     double definite_integrate_along(Field, Measure);
 
     template <typename Field>
-    intp::InterpolationFunction<double, 1> indefinite_integrate_along(
+    intp::InterpolationFunction1D<double> indefinite_integrate_along(
         Field,
         bool = true);
 };
@@ -72,7 +72,7 @@ double Contour::definite_integrate_along(Field f, Measure s) {
 }
 
 template <typename Field>
-intp::InterpolationFunction<double, 1> Contour::indefinite_integrate_along(
+intp::InterpolationFunction1D<double> Contour::indefinite_integrate_along(
     Field f,
     bool normalization) {
     std::vector<double> ordinate;
@@ -85,15 +85,19 @@ intp::InterpolationFunction<double, 1> Contour::indefinite_integrate_along(
 
     ordinate.push_back(ordinate.front());
     std::vector<double> abscissa;
-    abscissa.reserve(size() + 2);
-    abscissa.push_back(0);
-    abscissa.insert(abscissa.end(), g_file.geometric_poloidal_angles.begin(),
-                    g_file.geometric_poloidal_angles.end());
-    abscissa.push_back(g_file.geometric_poloidal_angles.front() + 2 * M_PI);
+    if (gfile.geometric_poloidal_angles.front() == 0) {
+        abscissa.reserve(size() + 1);
+    } else {
+        abscissa.reserve(size() + 2);
+        abscissa.push_back(0);
+    }
+    abscissa.insert(abscissa.end(), gfile.geometric_poloidal_angles.begin(),
+                    gfile.geometric_poloidal_angles.end());
+    abscissa.push_back(gfile.geometric_poloidal_angles.front() + 2 * M_PI);
 
-    intp::InterpolationFunction<double, 1> f_interp(
-        3, true, std::make_pair(ordinate.begin(), ordinate.end()),
-        std::make_pair(std::next(abscissa.begin()), abscissa.end()));
+    intp::InterpolationFunction1D<double> f_interp(
+        std::make_pair(std::next(abscissa.begin()), abscissa.end()),
+        std::make_pair(ordinate.begin(), ordinate.end()), 3, true);
 
     // do the integration segment by segment
 
@@ -114,9 +118,9 @@ intp::InterpolationFunction<double, 1> Contour::indefinite_integrate_along(
         for (auto& v : integral) { v *= coef; }
     }
 
-    intp::InterpolationFunction<double, 1> integral_interp(
-        3, std::make_pair(integral.begin(), integral.end()),
-        std::make_pair(abscissa.begin(), abscissa.end()));
+    intp::InterpolationFunction1D<double> integral_interp(
+        std::make_pair(abscissa.begin(), abscissa.end()),
+        std::make_pair(integral.begin(), integral.end()), 3, true);
 
     return integral_interp;
 }

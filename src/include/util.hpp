@@ -151,10 +151,12 @@ Tx cubic_interpolation(const Tx& a,
  * @brief Find root of a function using TOMS748. A simplified version adapted
  * from Boost library, ignoring most sanity checks.
  *
- * @tparam T input value type
+ * @tparam Tx input value type
  * @param func
  * @param a left staring point
  * @param b right starting point
+ * @param tol a function accepting two value and detemining them being within
+ * tolerance
  */
 template <typename Func, typename TolFunc, typename Tx>
 Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
@@ -254,6 +256,16 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
     return fb == 0 ? b : a;
 }
 
+/**
+ * @brief Find root of a function using TOMS748, with defalut tolerance function
+ *
+ * @tparam Func
+ * @tparam Tx
+ * @param func
+ * @param ax
+ * @param bx
+ * @return Tx
+ */
 template <typename Func, typename Tx>
 Tx find_root(const Func& func, const Tx& ax, const Tx& bx) {
     return find_root(func, ax, bx, [](Tx a, Tx b) {
@@ -271,7 +283,7 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx) {
  * @param v2
  * @param field_val
  */
-template <typename Func, unsigned D, typename T>
+template <typename Func, std::size_t D, typename T>
 Vec<D, T> vec_field_find_root(const Func& func,
                               const Vec<D, T>& v1,
                               const Vec<D, T>& v2,

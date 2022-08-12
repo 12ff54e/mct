@@ -38,5 +38,11 @@ int main(int argc, char const* argv[]) {
         v2_sum == Vec<2, double>{12, 24} && v2_diff == Vec<2, double>{8, 16},
         "Sum or Diff or Comparison failed.");
 
+    assertion(cross(Vec<2>{1, 2}) == Vec<2>{-2, 1}, "Cross on Vec2 failed.");
+    assertion(cross(Vec<3>{1, 2, 3}, Vec<3>{1, 2, 3}) == Vec<3>::zero(),
+              "Cross product of Vec3 failed.");
+    assertion(dot(Vec<3>{1, 2, 3}, Vec<3>{3, 2, 1}) == 10,
+              "Dot product failed");
+
     return assertion.status();
 }
