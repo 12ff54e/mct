@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "BSplineInterpolation/src/include/Interpolation.hpp"
 #include "Vec.hpp"
-#include "lib/BSplineInterpolation/intp"
 
 struct GFileRawData {
     std::string code_name;

@@ -15,7 +15,7 @@ else()
     set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 endif()
 
-include_directories(.)
+include_directories(./deps)
 add_compile_definitions($<$<CONFIG:Debug>:_DEBUG>)
 
 # add_executable(mct main.cpp)

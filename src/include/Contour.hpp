@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <vector>
 
-#include "lib/BSplineInterpolation/intp"
-
 #include "GFileRawData.hpp"
 #include "Vec.hpp"
 #include "util.hpp"
