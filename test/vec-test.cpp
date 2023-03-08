@@ -2,7 +2,7 @@
 #include <iomanip>
 #include "Assertion.hpp"
 
-int main(int argc, char const* argv[]) {
+int main() {
     Assertion assertion;
 
     auto v2_origin = Vec<2, double>::zero();

@@ -36,6 +36,11 @@ inline T arctan(const Vec<2, T>& pt) {
     return arctan(pt.x(), pt.y());
 }
 
+template <typename T>
+inline T lerp(T left, T right, T c) {
+    return (static_cast<T>(1) - c) * left + c * right;
+}
+
 // auxilary functions for find root
 namespace detail {
 
@@ -155,7 +160,7 @@ Tx cubic_interpolation(const Tx& a,
  * @param func
  * @param a left staring point
  * @param b right starting point
- * @param tol a function accepting two value and detemining them being within
+ * @param tol a function accepting two value and determining them being within
  * tolerance
  */
 template <typename Func, typename TolFunc, typename Tx>
@@ -257,7 +262,7 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
 }
 
 /**
- * @brief Find root of a function using TOMS748, with defalut tolerance function
+ * @brief Find root of a function using TOMS748, with default tolerance function
  *
  * @tparam Func
  * @tparam Tx

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iostream>
+#include <sstream>
 
 #include "include/GFileRawData.hpp"
 #include "include/util.hpp"
@@ -10,45 +11,58 @@ bool GFileRawData::is_complete() const noexcept {
 
 std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     std::string s_dum;
+    std::string line;
+    std::stringstream ss_line;
     double d_dum;
     // 1st line
-    is >> g.code_name >> g.date >> s_dum;
-    is >> g.shot_id >> g.time >> s_dum;
-    if (is.tellg() < 51) { is >> s_dum; }
-    is >> g.nw >> g.nh;
-    if (is.fail()) {
+    std::getline(is, line);
+    ss_line.str(line);
+    ss_line >> g.code_name >> g.date >> s_dum;
+    ss_line >> g.shot_id >> g.time >> s_dum;
+    if (ss_line.tellg() < 51) { ss_line >> s_dum; }
+    ss_line >> g.nw >> g.nh;
+    if (ss_line.fail()) {
         std::cout << "Data corruption at 1st line.\n";
         return is;
     }
     // 2nd line
-    is >> g.dim.x() >> g.dim.y() >> g.r_center >> g.r_left >> g.z_mid;
-    if (is.fail()) {
+    std::getline(is, line);
+    ss_line.str(line);
+    ss_line >> g.dim.x() >> g.dim.y() >> g.r_center >> g.r_left >> g.z_mid;
+    if (ss_line.fail()) {
         std::cout << "Data corruption at 2nd line.\n";
         return is;
     }
     // 3rd line
-    is >> g.magnetic_axis.x() >> g.magnetic_axis.y() >> g.flux_magnetic_axis >>
-        g.flux_LCFS >> g.b_center;
-    if (is.fail()) {
+    std::getline(is, line);
+    ss_line.str(line);
+    ss_line >> g.magnetic_axis.x() >> g.magnetic_axis.y() >>
+        g.flux_magnetic_axis >> g.flux_LCFS >> g.b_center;
+    if (ss_line.fail()) {
         std::cout << "Data corruption at 3rd line.\n";
         return is;
     }
     // 4th line
-    is >> g.current >> d_dum >> d_dum >> d_dum >> d_dum;
-    if (is.fail()) {
+    std::getline(is, line);
+    ss_line.str(line);
+    ss_line >> g.current >> d_dum >> d_dum >> d_dum >> d_dum;
+    if (ss_line.fail()) {
         std::cout << "Data corruption at 4th line.\n";
         return is;
     }
     // 5th line
-    is >> d_dum >> d_dum >> g.flux_sep >> g.sep.x() >> g.sep.y();
-    if (is.fail()) {
+    std::getline(is, line);
+    ss_line.str(line);
+    ss_line >> d_dum >> d_dum >> g.flux_sep >> g.sep.x() >> g.sep.y();
+    if (ss_line.fail()) {
         std::cout << "Data corruption at 5th line.\n";
         return is;
     }
 
     auto read_vec = [&is](unsigned int count, std::vector<double>& arr) {
-        double d;
+        arr.reserve(count);
         for (unsigned i = 0; i < count; ++i) {
+            double d;
             is >> d;
             arr.emplace_back(d);
         }
@@ -61,7 +75,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
         return is;
     }
     // pressure
-    read_vec(g.nw, g.presure);
+    read_vec(g.nw, g.pressure);
     if (is.fail()) {
         std::cout << "Data corruption at pressure.\n";
         return is;
@@ -123,7 +137,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
         return is;
     }
 
-    if (!is.fail()) { g.__complete = true; }
+    g.__complete = true;
 
     return is;
 }
@@ -138,6 +152,7 @@ void GFileRawData::rearrange_boundary() {
 
         if (i > 0 && std::abs(geometric_poloidal_angles[i] -
                               geometric_poloidal_angles[i - 1]) > M_PI) {
+            // middle is the index of the first angle crossing \theta=0
             middle = i;
         }
     }

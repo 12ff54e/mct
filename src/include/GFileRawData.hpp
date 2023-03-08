@@ -42,8 +42,8 @@ struct GFileRawData {
 
     // poloidal current density profile
     std::vector<double> f_pol;
-    // presure profile
-    std::vector<double> presure;
+    // pressure profile
+    std::vector<double> pressure;
     // f*f^{\prime}
     std::vector<double> f_f_prime;
     // p^{\prime}
