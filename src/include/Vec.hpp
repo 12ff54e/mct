@@ -6,16 +6,6 @@
 #include <utility>
 
 /**
- * @brief Common functionality across all Vec type regardless of internal value
- * type and dimensionality.
- *
- * @tparam D Dimension of the underlying space.
- * @tparam T Type of coordinate.
- */
-template <std::size_t D, typename T>
-class Vec_base;
-
-/**
  * @brief A vector in Eucleadian space.
  *
  * @tparam D Dimension of the underlying space.
@@ -72,6 +62,20 @@ class Vec_base {
 
     // comparison operations
 
+#if __cplusplus >= 202002L
+    friend bool operator==(const vec_type& lhs, const vec_type& rhs) {
+        auto equal_aux = []<std::size_t... indices>(
+            std::index_sequence<indices...>, const vec_type& lhs,
+            const vec_type& rhs) {
+            return (... && (lhs[indices] == rhs[indices]));
+        };
+        return equal_aux(std::make_index_sequence<dim>{}, lhs, rhs);
+    }
+
+    friend bool operator!=(const vec_type& lhs, const vec_type& rhs) {
+        return !operator==(lhs, rhs);
+    }
+#else
     bool operator==(const vec_type& rhs) const noexcept {
         for (std::size_t i = 0; i < dim; ++i) {
             if (coord[i] != rhs[i]) { return false; }
@@ -81,13 +85,16 @@ class Vec_base {
     bool operator!=(const vec_type& rhs) const noexcept {
         return !operator==(rhs);
     }
-
+#endif
     // arithmetic operations
-
-    vec_type& operator+=(const vec_type& rhs) noexcept {
-        for (std::size_t i = 0; i < dim; ++i) { coord[i] += rhs[i]; }
-        return *reinterpret_cast<vec_type*>(this);
+    friend vec_type& operator+=(vec_type& lhs, const vec_type& rhs) noexcept {
+        for (std::size_t i = 0; i < dim; ++i) { lhs[i] += rhs[i]; }
+        return lhs;
     }
+    // vec_type& operator+=(const vec_type& rhs) noexcept {
+    //     for (std::size_t i = 0; i < dim; ++i) { coord[i] += rhs[i]; }
+    //     return *reinterpret_cast<vec_type*>(this);
+    // }
     vec_type& operator-=(const vec_type& rhs) noexcept {
         for (std::size_t i = 0; i < dim; ++i) { coord[i] -= rhs[i]; }
         return *reinterpret_cast<vec_type*>(this);
@@ -190,9 +197,28 @@ Vec<3, T> cross(const Vec<3, T>& v1, const Vec<3, T>& v2) {
                      v1.x() * v2.y() - v1.y() * v2.x()};
 }
 
+namespace vec_impl {
+
+#if __cplusplus < 202002L
+template <typename T, std::size_t... indices>
+T dot_aux(std::index_sequence<indices...>,
+          const Vec<sizeof...(indices), T>& v1,
+          const Vec<sizeof...(indices), T>& v2) {
+    return (... + (v1[indices] * v2[indices]));
+}
+#endif
+
+}  // namespace vec_impl
+
 template <std::size_t D, typename T = double>
 T dot(const Vec<D, T>& v1, const Vec<D, T>& v2) {
-    T p = 0;
-    for (std::size_t i = 0; i < D; ++i) { p += v1[i] * v2[i]; }
-    return p;
+#if __cplusplus >= 202002L
+    auto dot_aux = []<std::size_t... indices>(
+        std::index_sequence<indices...>, const Vec<sizeof...(indices), T>& v1,
+        const Vec<sizeof...(indices), T>& v2) {
+        return (... + (v1[indices] * v2[indices]));
+    };
+#endif
+    using namespace vec_impl;
+    return dot_aux(std::make_index_sequence<D>{}, v1, v2);
 }

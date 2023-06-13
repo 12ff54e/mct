@@ -5,8 +5,8 @@
 int main() {
     Assertion assertion;
 
-    auto v2_origin = Vec<2, double>::zero();
-    Vec<2, double> v2_a{1, 2};
+    auto v2_origin = Vec<2>::zero();
+    Vec<2> v2_a{1, 2};
 
     assertion(v2_origin.x() == 0,
               std::string{"Difference between origin x and 0: "} +
@@ -15,7 +15,7 @@ int main() {
                                  std::to_string(v2_a.y() - 2));
 
     Vec<3, int> v3_a{2, 2, 2};
-    Vec<3, double> v3_b(v3_a);
+    Vec<3> v3_b(v3_a);
 
     assertion(v3_a.x() == 2., "Convert construction failed.");
 

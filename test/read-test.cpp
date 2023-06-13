@@ -98,15 +98,27 @@ int main() {
         return r * r2 / (dp_dr * pt.x() + dp_dz * pt.y());
     };
 
+    auto bp_field_square = [&](Vec<2, double> pt, double) {
+        double dp_dr = flux_function.derivative(pt, {1, 0});
+        double dp_dz = flux_function.derivative(pt, {0, 1});
+
+        return (dp_dr * dp_dr + dp_dz * dp_dz) / (pt.x() * pt.x());
+    };
+
+    auto bt_field_square = [&](Vec<2, double> pt, double psi) {
+        double f = poloidal_current_intp(psi);
+        return f * f / (pt.x() * pt.x());
+    };
+
     std::vector<double> poloidal_angles{gfile_data.geometric_poloidal_angles};
     poloidal_angles.push_back(poloidal_angles.front() + PI2);
     intp::InterpolationFunctionTemplate1D<> poloidal_template{
-        intp::util::get_range(poloidal_angles), poloidal_angles.size(), 3,
+        intp::util::get_range(poloidal_angles), poloidal_angles.size(), 5,
         true};
     poloidal_angles.insert(poloidal_angles.begin(), 0);
     poloidal_angles.back() = PI2;
     intp::InterpolationFunctionTemplate1D<> poloidal_template_full{
-        intp::util::get_range(poloidal_angles), poloidal_angles.size(), 3,
+        intp::util::get_range(poloidal_angles), poloidal_angles.size(), 5,
         false};
 
     intp::Mesh<double, 2> magnetic_boozer{RADIAL_GRID_COUNT,
@@ -117,7 +129,9 @@ int main() {
                                           POLOIDAL_GRID_COUNT + 1};
 
     std::vector<double> b2j_average;
+    std::vector<double> tc;
     b2j_average.reserve(RADIAL_GRID_COUNT);
+    tc.reserve(RADIAL_GRID_COUNT);
 
     // first point in radial direction is magnetic axis
 
@@ -131,30 +145,34 @@ int main() {
         };
         set_ma_val(1., magnetic_boozer);
         set_ma_val(1., r_boozer);
-        set_ma_val(gfile_data.magnetic_axis.y() / R0, z_boozer);
+        set_ma_val(0., z_boozer);
         set_ma_val(0., jacobian_boozer);
 
         b2j_average.push_back(gfile_data.safety_factor[0] *
                               gfile_data.f_pol[0]);
+        tc.push_back(0.);
     }
     // iterate through contour
     for (size_t ri = 0; ri < contours.size(); ++ri) {
         double psi = (ri + 1) * flux_delta;
         // contour pt number + 1
         const size_t poloidal_size = contours[ri].size() + 1;
-        std::vector<double> r_geo, z_geo, b2j_geo;
+        std::vector<double> r_geo, z_geo, b2j_geo, bp_square_geo, bt_square_geo;
         r_geo.reserve(poloidal_size);
         z_geo.reserve(poloidal_size);
         b2j_geo.reserve(poloidal_size);
+        bp_square_geo.reserve(poloidal_size);
+        bt_square_geo.reserve(poloidal_size);
         for (size_t i = 0; i < poloidal_size; ++i) {
-            const auto& pt = contours[ri][i % poloidal_size];
+            const auto& pt = contours[ri][i % (poloidal_size - 1)];
             r_geo.push_back(pt.x());
             z_geo.push_back(pt.y());
             b2j_geo.push_back(b2j(pt, psi));
+            bp_square_geo.push_back(bp_field_square(pt, psi) *
+                                    j_field(pt, psi));
+            bt_square_geo.push_back(bt_field_square(pt, psi) *
+                                    j_field(pt, psi));
         }
-        r_geo.push_back(r_geo.front());
-        z_geo.push_back(z_geo.front());
-        b2j_geo.push_back(b2j_geo.front());
 
         auto r_geo_intp =
             poloidal_template.interpolate(intp::util::get_range(r_geo));
@@ -162,20 +180,40 @@ int main() {
             poloidal_template.interpolate(intp::util::get_range(z_geo));
         auto b2j_geo_intp =
             poloidal_template.interpolate(intp::util::get_range(b2j_geo));
+        auto bp_square_geo_intp =
+            poloidal_template.interpolate(intp::util::get_range(bp_square_geo));
+        auto bt_square_geo_intp =
+            poloidal_template.interpolate(intp::util::get_range(bt_square_geo));
 
         // integrate then interpolate to get \theta_boozer(\theta_geo)
 
         std::vector<double> boozer_geo;
         boozer_geo.reserve(poloidal_angles.size());
         boozer_geo.push_back(0);
+
+        std::vector<double> bpa;
+        bpa.reserve(poloidal_angles.size());
+        bpa.push_back(0);
+        std::vector<double> bta;
+        bta.reserve(poloidal_angles.size());
+        bta.push_back(0);
         // Poloidal grid begins from \theta = 0 and ends at \theta = 2\pi
         for (size_t i = 1; i < poloidal_angles.size(); ++i) {
             boozer_geo.push_back(boozer_geo.back() +
                                  util::integrate_coarse(b2j_geo_intp,
                                                         poloidal_angles[i - 1],
                                                         poloidal_angles[i]));
+            bpa.push_back(bpa.back() +
+                          util::integrate_coarse(bp_square_geo_intp,
+                                                 poloidal_angles[i - 1],
+                                                 poloidal_angles[i]));
+            bta.push_back(bta.back() +
+                          util::integrate_coarse(bt_square_geo_intp,
+                                                 poloidal_angles[i - 1],
+                                                 poloidal_angles[i]));
         }
         b2j_average.push_back(boozer_geo.back() / PI2);
+        tc.push_back(bpa.back() / (PI2 * R0 * B0));
         // normalization
         for (auto& v : boozer_geo) { v /= b2j_average.back(); }
         auto boozer_geo_intp = poloidal_template_full.interpolate(
@@ -231,7 +269,7 @@ int main() {
     // interpolation of 1D functions
 
     intp::InterpolationFunction1D<> safety_factor_intp(
-        std::make_pair(0., flux_diff),
+        std::make_pair(0., flux_wall),
         intp::util::get_range(gfile_data.safety_factor), 2);
 
     auto normalized_poloidal_current = gfile_data.f_pol;
@@ -248,8 +286,7 @@ int main() {
                 normalized_poloidal_current_intp(i * flux_delta);
     }
     intp::InterpolationFunction1D<> normalized_toroidal_current_intp(
-        std::make_pair(0., flux_wall),
-        intp::util::get_range(normalized_toroidal_current), 2);
+        std::make_pair(0., flux_wall), intp::util::get_range(tc), 2);
 
     constexpr double magnetic_constant = 4.e-7 * M_PI;
     auto normalized_pressure = gfile_data.pressure;
@@ -309,9 +346,34 @@ int main() {
             if ((POLOIDAL_GRID_COUNT + 1) % 4 != 0) { os << '\n'; }
         }
     };
+    auto write_2d_coef_first_seg = [&](std::ostream& os, auto& f_2d) {
+        for (size_t i = 0; i < 9; ++i) {
+            size_t psi_order = i % 3;
+            size_t theta_order = i / 3;
+            for (size_t j = 0; j <= POLOIDAL_GRID_COUNT; ++j) {
+                double v1 = theta_order == 0
+                                ? f_2d(flux_delta, theta_delta * j) -
+                                      f_2d(0., theta_delta * j)
+                                : f_2d.derivative({flux_delta, theta_delta * j},
+                                                  {0, theta_order}) -
+                                      f_2d.derivative({0., theta_delta * j},
+                                                      {0, theta_order});
+                double v2 = f_2d.derivative({flux_delta, theta_delta * j},
+                                            {1, theta_order});
+                std::array<double, 3> psi_coef{
+                    theta_order == 0 ? f_2d(0., theta_delta * j) : 0.,
+                    2. * (v1 - v2 * flux_delta) / std::sqrt(flux_delta),
+                    -(v1 - 2. * v2 * flux_delta) / flux_delta};
+                os << std::setw(18)
+                   << (theta_order == 2 ? .5 : 1.) * psi_coef[psi_order];
+                if (j % 4 == 3) { os << '\n'; }
+            }
+            if ((POLOIDAL_GRID_COUNT + 1) % 4 != 0) { os << '\n'; }
+        }
+    };
 
     if constexpr (true) {
-        std::ofstream sp_data("../spdata.dat", std::ios::out);
+        std::ofstream sp_data("../data/spdata.dat", std::ios::out);
         sp_data << "Generated by MCT, from " << filename << '\n';
         sp_data << std::setw(4) << RADIAL_GRID_COUNT << std::setw(4)
                 << POLOIDAL_GRID_COUNT << std::setw(4) << 4 << std::setw(4) << 8
@@ -320,17 +382,35 @@ int main() {
         sp_data << std::setw(18) << flux_wall << std::setw(18) << flux_wall
                 << '\n';
         for (size_t i = 0; i < RADIAL_GRID_COUNT; ++i) {
-            write_2d_coef(sp_data, magnetic_boozer_intp, i * flux_delta);
-            write_2d_coef(sp_data, r_boozer_intp, i * flux_delta);
-            write_2d_coef(sp_data, z_boozer_intp, i * flux_delta);
-            write_2d_coef(sp_data, jacobian_boozer_intp, i * flux_delta);
+            // first interval is different
+            if (i == 0) {
+                write_2d_coef_first_seg(sp_data, magnetic_boozer_intp);
+                write_2d_coef_first_seg(sp_data, r_boozer_intp);
+                write_2d_coef_first_seg(sp_data, z_boozer_intp);
+                write_2d_coef_first_seg(sp_data, jacobian_boozer_intp);
+            } else {
+                write_2d_coef(sp_data, magnetic_boozer_intp, i * flux_delta);
+                write_2d_coef(sp_data, r_boozer_intp, i * flux_delta);
+                write_2d_coef(sp_data, z_boozer_intp, i * flux_delta);
+                write_2d_coef(sp_data, jacobian_boozer_intp, i * flux_delta);
+            }
             write_1d_coef(sp_data, safety_factor_intp, i * flux_delta);
             write_1d_coef(sp_data, normalized_poloidal_current_intp,
                           i * flux_delta);
             write_1d_coef(sp_data, normalized_toroidal_current_intp,
                           i * flux_delta);
             write_1d_coef(sp_data, normalized_pressure_intp, i * flux_delta);
-            write_1d_coef(sp_data, normalized_r_minor_intp, i * flux_delta);
+            // r_minor has different definition of coefficient at first interval
+            if (i == 0) {
+                double v1 = normalized_r_minor_intp(flux_delta);
+                double v2 = normalized_r_minor_intp.derivative({flux_delta}, 1);
+                double c1 = 2. * (v1 - v2 * flux_delta) / std::sqrt(flux_delta);
+                double c2 = -(v1 - 2. * v2 * flux_delta) / flux_delta;
+                sp_data << std::setw(18) << 0. << std::setw(18) << c1
+                        << std::setw(18) << c2 << '\n';
+            } else {
+                write_1d_coef(sp_data, normalized_r_minor_intp, i * flux_delta);
+            }
             write_1d_coef(sp_data, normalized_toroidal_flux_intp,
                           i * flux_delta);
         }
@@ -343,6 +423,9 @@ int main() {
     }
 
     auto t_after_output = high_resolution_clock::now();
+
+    std::cout << "Creating spdata from gfile finished.\n";
+    std::cout << "R0 = " << R0 << ", B0 = " << B0 << '\n';
 
     std::cout << "\nPhase\t\t\tTime consumption (ms)\n";
     std::cout << "read file\t\t"
