@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MCT_VEC_
+#define MCT_VEC_
 
 #include <array>
 #include <cmath>
@@ -6,7 +7,7 @@
 #include <utility>
 
 /**
- * @brief A vector in Eucleadian space.
+ * @brief A vector in Euclidean space.
  *
  * @tparam D Dimension of the underlying space.
  * @tparam T Type of coordinate.
@@ -151,7 +152,7 @@ class Vec_base {
 
 /**
  * @brief Generic Vector type of any dimension, default to consisting double as
- * coordinateds
+ * coordinates
  *
  * @tparam D Dimension
  * @tparam T Underlying types of each dimension
@@ -222,3 +223,5 @@ T dot(const Vec<D, T>& v1, const Vec<D, T>& v2) {
     using namespace vec_impl;
     return dot_aux(std::make_index_sequence<D>{}, v1, v2);
 }
+
+#endif

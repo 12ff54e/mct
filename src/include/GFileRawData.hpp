@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MCT_GFILE_RAW_DATA_
+#define MCT_GFILE_RAW_DATA_
 
 #include <fstream>
 #include <string>
@@ -31,13 +32,13 @@ struct GFileRawData {
     double flux_magnetic_axis;
     // magnetic flux at Last Closed Flux Surface
     double flux_LCFS;
-    // mangetic field strength at center position
+    // magnetic field strength at center position
     double b_center;
     // current
     double current;
-    // magnetic flux at seperatrix
+    // magnetic flux at separatrix
     double flux_sep;
-    // seperatrix coordinate
+    // separatrix coordinate
     Vec<2, double> sep;
 
     // poloidal current density profile
@@ -91,3 +92,5 @@ struct GFileRawData {
     // the completeness of raw data
     bool __complete;
 };
+
+#endif

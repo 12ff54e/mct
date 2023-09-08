@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MCT_CONTOUR_
+#define MCT_CONTOUR_
 
 #include <algorithm>
 #include <vector>
@@ -13,7 +14,7 @@ class Contour {
 
    private:
     std::vector<pt_type> pts;
-    const GFileRawData& gfile;
+    const GFileRawData& g_file;
 
    public:
     Contour(double,
@@ -24,7 +25,7 @@ class Contour {
 
     size_t size() const noexcept;
 
-    // elment access
+    // element access
 
     const Vec<2, double>& operator[](size_t) const;
 
@@ -83,15 +84,15 @@ intp::InterpolationFunction1D<double> Contour::indefinite_integrate_along(
 
     ordinate.push_back(ordinate.front());
     std::vector<double> abscissa;
-    if (gfile.geometric_poloidal_angles.front() == 0) {
+    if (g_file.geometric_poloidal_angles.front() == 0) {
         abscissa.reserve(size() + 1);
     } else {
         abscissa.reserve(size() + 2);
         abscissa.push_back(0);
     }
-    abscissa.insert(abscissa.end(), gfile.geometric_poloidal_angles.begin(),
-                    gfile.geometric_poloidal_angles.end());
-    abscissa.push_back(gfile.geometric_poloidal_angles.front() + 2 * M_PI);
+    abscissa.insert(abscissa.end(), g_file.geometric_poloidal_angles.begin(),
+                    g_file.geometric_poloidal_angles.end());
+    abscissa.push_back(g_file.geometric_poloidal_angles.front() + 2 * M_PI);
 
     intp::InterpolationFunction1D<double> f_interp(
         std::make_pair(std::next(abscissa.begin()), abscissa.end()),
@@ -122,3 +123,5 @@ intp::InterpolationFunction1D<double> Contour::indefinite_integrate_along(
 
     return integral_interp;
 }
+
+#endif

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MCT_UTIL_
+#define MCT_UTIL_
 
 #include <cmath>
 #include <iostream>
@@ -472,3 +473,5 @@ auto integrate_coarse(const Func& func,
 }
 
 }  // namespace util
+
+#endif

@@ -71,7 +71,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     // poloidal current
     read_vec(g.nw, g.f_pol);
     if (is.fail()) {
-        std::cout << "Data corruption at fpol.\n";
+        std::cout << "Data corruption at poloidal current.\n";
         return is;
     }
     // pressure
@@ -83,13 +83,13 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     // f*f^{\prime}
     read_vec(g.nw, g.f_f_prime);
     if (is.fail()) {
-        std::cout << "Data corruption at ffprime.\n";
+        std::cout << "Data corruption at f*f'.\n";
         return is;
     }
     // p^{\prime}
     read_vec(g.nw, g.p_prime);
     if (is.fail()) {
-        std::cout << "Data corruption at pprime.\n";
+        std::cout << "Data corruption at p*p'.\n";
         return is;
     }
     // flux
@@ -98,7 +98,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
         for (unsigned i = 0; i < g.nw; ++i) { is >> g.flux(i, j); }
     }
     if (is.fail()) {
-        std::cout << "Data corruption at psirz.\n";
+        std::cout << "Data corruption at \psi(r,z).\n";
         return is;
     }
     // safety factor

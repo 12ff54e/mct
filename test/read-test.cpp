@@ -17,26 +17,26 @@ int main() {
     auto t_start = high_resolution_clock::now();
 
     std::string filename = "gfile-cfetr5.7-baseline-129";
-    std::ifstream gfile(std::string("../data/") + filename);
-    if (!gfile.is_open()) {
+    std::ifstream g_file(std::string("../data/") + filename);
+    if (!g_file.is_open()) {
         assertion(false, "Can not open g-file.");
         return assertion.status();
     }
 
-    GFileRawData gfile_data;
-    gfile >> gfile_data;
-    assertion(gfile_data.is_complete(), "Parse g-file failed.");
+    GFileRawData g_file_data;
+    g_file >> g_file_data;
+    assertion(g_file_data.is_complete(), "Parse g_file failed.");
     if (assertion.last_status()) { return assertion.status(); }
-    gfile.close();
+    g_file.close();
 
     auto t_after_read_file = high_resolution_clock::now();
 
     intp::InterpolationFunction<double, 2u> flux_function(
-        3, gfile_data.flux,
-        std::make_pair(gfile_data.r_center - .5 * gfile_data.dim.x(),
-                       gfile_data.r_center + .5 * gfile_data.dim.x()),
-        std::make_pair(gfile_data.z_mid - .5 * gfile_data.dim.y(),
-                       gfile_data.z_mid + .5 * gfile_data.dim.y()));
+        3, g_file_data.flux,
+        std::make_pair(g_file_data.r_center - .5 * g_file_data.dim.x(),
+                       g_file_data.r_center + .5 * g_file_data.dim.x()),
+        std::make_pair(g_file_data.z_mid - .5 * g_file_data.dim.y(),
+                       g_file_data.z_mid + .5 * g_file_data.dim.y()));
 
     auto t_after_psi_mesh = high_resolution_clock::now();
 
@@ -48,7 +48,7 @@ int main() {
 
     constexpr double PI2 = 2 * M_PI;
 
-    double flux_diff = gfile_data.flux_LCFS - gfile_data.flux_magnetic_axis;
+    double flux_diff = g_file_data.flux_LCFS - g_file_data.flux_magnetic_axis;
     double flux_wall = .99 * flux_diff;
     double flux_delta = flux_wall / (RADIAL_GRID_COUNT - 1);
     const double theta_delta = PI2 / POLOIDAL_GRID_COUNT;
@@ -56,15 +56,15 @@ int main() {
     // Radial direction is divided into `RADIAL_GRID_COUNT-1` intervals.
     // `Contours` store `RADIAL_GRID_COUNT - 1` contours.
     for (size_t i = 1; i < RADIAL_GRID_COUNT; ++i) {
-        double psi = gfile_data.flux_magnetic_axis + i * flux_delta;
-        contours.emplace_back(psi, flux_function, gfile_data);
+        double psi = g_file_data.flux_magnetic_axis + i * flux_delta;
+        contours.emplace_back(psi, flux_function, g_file_data);
     }
 
     auto t_after_contour_construction = high_resolution_clock::now();
 
     // poloidal current
     intp::InterpolationFunction1D<> poloidal_current_intp{
-        std::make_pair(0., flux_diff), intp::util::get_range(gfile_data.f_pol),
+        std::make_pair(0., flux_diff), intp::util::get_range(g_file_data.f_pol),
         3};
 
     // construct boozer coordinate, integrate B^2 * J along each contour
@@ -72,7 +72,7 @@ int main() {
         double dp_dr = flux_function.derivative(pt, {1, 0});
         double dp_dz = flux_function.derivative(pt, {0, 1});
         double r = pt.x();
-        pt -= gfile_data.magnetic_axis;
+        pt -= g_file_data.magnetic_axis;
         double r2 = pt.__L2_norm_square();
         double f = poloidal_current_intp(psi);
 
@@ -92,7 +92,7 @@ int main() {
         double dp_dr = flux_function.derivative(pt, {1, 0});
         double dp_dz = flux_function.derivative(pt, {0, 1});
         double r = pt.x();
-        pt -= gfile_data.magnetic_axis;
+        pt -= g_file_data.magnetic_axis;
         double r2 = pt.__L2_norm_square();
 
         return r * r2 / (dp_dr * pt.x() + dp_dz * pt.y());
@@ -110,7 +110,7 @@ int main() {
         return f * f / (pt.x() * pt.x());
     };
 
-    std::vector<double> poloidal_angles{gfile_data.geometric_poloidal_angles};
+    std::vector<double> poloidal_angles{g_file_data.geometric_poloidal_angles};
     poloidal_angles.push_back(poloidal_angles.front() + PI2);
     intp::InterpolationFunctionTemplate1D<> poloidal_template{
         intp::util::get_range(poloidal_angles), poloidal_angles.size(), 5,
@@ -135,8 +135,8 @@ int main() {
 
     // first point in radial direction is magnetic axis
 
-    double B0 = b_field(gfile_data.magnetic_axis, 0.);
-    double R0 = gfile_data.magnetic_axis.x();
+    double B0 = b_field(g_file_data.magnetic_axis, 0.);
+    double R0 = g_file_data.magnetic_axis.x();
     {
         auto set_ma_val = [&](double val, auto& field) {
             for (size_t i = 0; i < POLOIDAL_GRID_COUNT; ++i) {
@@ -148,8 +148,8 @@ int main() {
         set_ma_val(0., z_boozer);
         set_ma_val(0., jacobian_boozer);
 
-        b2j_average.push_back(gfile_data.safety_factor[0] *
-                              gfile_data.f_pol[0]);
+        b2j_average.push_back(g_file_data.safety_factor[0] *
+                              g_file_data.f_pol[0]);
         tc.push_back(0.);
     }
     // iterate through contour
@@ -238,7 +238,7 @@ int main() {
             magnetic_boozer(ri + 1, i) = b_field({r_grid, z_grid}, psi) / B0;
             r_boozer(ri + 1, i) = r_grid / R0;
             // z value is shifted such that magnetic axis has z = 0
-            z_boozer(ri + 1, i) = (z_grid - gfile_data.magnetic_axis.y()) / R0;
+            z_boozer(ri + 1, i) = (z_grid - g_file_data.magnetic_axis.y()) / R0;
             jacobian_boozer(ri + 1, i) =
                 j_field({r_grid, z_grid}, psi) / R0 * B0;
         }
@@ -270,9 +270,9 @@ int main() {
 
     intp::InterpolationFunction1D<> safety_factor_intp(
         std::make_pair(0., flux_wall),
-        intp::util::get_range(gfile_data.safety_factor), 2);
+        intp::util::get_range(g_file_data.safety_factor), 2);
 
-    auto normalized_poloidal_current = gfile_data.f_pol;
+    auto normalized_poloidal_current = g_file_data.f_pol;
     for (auto& v : normalized_poloidal_current) { v /= (B0 * R0); }
     intp::InterpolationFunction1D<> normalized_poloidal_current_intp(
         std::make_pair(0., flux_diff),
@@ -289,7 +289,7 @@ int main() {
         std::make_pair(0., flux_wall), intp::util::get_range(tc), 2);
 
     constexpr double magnetic_constant = 4.e-7 * M_PI;
-    auto normalized_pressure = gfile_data.pressure;
+    auto normalized_pressure = g_file_data.pressure;
     for (auto& v : normalized_pressure) { v /= (B0 * B0 / magnetic_constant); }
     intp::InterpolationFunction1D<> normalized_pressure_intp(
         std::make_pair(0., flux_diff),
@@ -424,7 +424,7 @@ int main() {
 
     auto t_after_output = high_resolution_clock::now();
 
-    std::cout << "Creating spdata from gfile finished.\n";
+    std::cout << "Creating spdata from g_file finished.\n";
     std::cout << "R0 = " << R0 << ", B0 = " << B0 << '\n';
 
     std::cout << "\nPhase\t\t\tTime consumption (ms)\n";
@@ -472,10 +472,10 @@ int main() {
 
     std::cout << B0 * B0 * R0 /
                      std::sqrt(flux_function.derivative(
-                                   gfile_data.magnetic_axis, {2, 0}) *
+                                   g_file_data.magnetic_axis, {2, 0}) *
                                flux_function.derivative(
-                                   gfile_data.magnetic_axis, {0, 2}))
-              << ", " << gfile_data.safety_factor[0] * gfile_data.f_pol[0]
+                                   g_file_data.magnetic_axis, {0, 2}))
+              << ", " << g_file_data.safety_factor[0] * g_file_data.f_pol[0]
               << '\n';
 
     return assertion.status();
