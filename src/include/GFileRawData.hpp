@@ -72,7 +72,7 @@ struct GFileRawData {
 
     // constructors
 
-    GFileRawData() : flux{1, 1}, __complete(false){};
+    GFileRawData() : flux{1, 1}, complete_(false) {}
     GFileRawData(const GFileRawData&) = delete;
     GFileRawData(GFileRawData&&) = default;
 
@@ -90,7 +90,7 @@ struct GFileRawData {
 
    private:
     // the completeness of raw data
-    bool __complete;
+    bool complete_;
 };
 
 #endif

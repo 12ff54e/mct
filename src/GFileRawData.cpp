@@ -6,7 +6,7 @@
 #include "include/util.hpp"
 
 bool GFileRawData::is_complete() const noexcept {
-    return __complete;
+    return complete_;
 }
 
 std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
@@ -98,7 +98,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
         for (unsigned i = 0; i < g.nw; ++i) { is >> g.flux(i, j); }
     }
     if (is.fail()) {
-        std::cout << "Data corruption at \psi(r,z).\n";
+        std::cout << "Data corruption at \\psi(r,z).\n";
         return is;
     }
     // safety factor
@@ -137,7 +137,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
         return is;
     }
 
-    g.__complete = true;
+    g.complete_ = true;
 
     return is;
 }
@@ -157,10 +157,13 @@ void GFileRawData::rearrange_boundary() {
         }
     }
 
-    std::rotate(boundary.begin(), boundary.begin() + middle, boundary.end());
-    std::rotate(geometric_poloidal_angles.begin(),
-                geometric_poloidal_angles.begin() + middle,
-                geometric_poloidal_angles.end());
+    std::rotate(boundary.begin(),
+                boundary.begin() + static_cast<std::ptrdiff_t>(middle),
+                boundary.end());
+    std::rotate(
+        geometric_poloidal_angles.begin(),
+        geometric_poloidal_angles.begin() + static_cast<std::ptrdiff_t>(middle),
+        geometric_poloidal_angles.end());
 
     {
         auto last = std::unique(geometric_poloidal_angles.begin(),

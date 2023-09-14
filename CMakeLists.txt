@@ -12,11 +12,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(MSVC)
     set(CMAKE_CXX_FLAGS "/W4 /EHsc")
 else()
-    set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+    set(CMAKE_CXX_FLAGS "-Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-pre-c++14-compat -Wno-padded")
 endif()
 
 include_directories(./deps)
-add_compile_definitions($<$<CONFIG:Debug>:_DEBUG>)
+add_compile_definitions($<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:_DEBUG>)
 
 # add_executable(mct main.cpp)
 

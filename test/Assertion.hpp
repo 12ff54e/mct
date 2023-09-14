@@ -3,11 +3,11 @@
 
 class Assertion {
    private:
-    int err;
-    int last_err;
+    int err = 0;
+    int last_err = 0;
 
    public:
-    Assertion() : err(0) {}
+    Assertion() {}
 
     void operator()(bool t) {
         last_err = t ? 0 : 1;

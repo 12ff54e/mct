@@ -56,7 +56,8 @@ int main() {
     // Radial direction is divided into `RADIAL_GRID_COUNT-1` intervals.
     // `Contours` store `RADIAL_GRID_COUNT - 1` contours.
     for (size_t i = 1; i < RADIAL_GRID_COUNT; ++i) {
-        double psi = g_file_data.flux_magnetic_axis + i * flux_delta;
+        double psi = g_file_data.flux_magnetic_axis +
+                     static_cast<double>(i) * flux_delta;
         contours.emplace_back(psi, flux_function, g_file_data);
     }
 
@@ -73,7 +74,7 @@ int main() {
         double dp_dz = flux_function.derivative(pt, {0, 1});
         double r = pt.x();
         pt -= g_file_data.magnetic_axis;
-        double r2 = pt.__L2_norm_square();
+        double r2 = pt.L2_norm_square_();
         double f = poloidal_current_intp(psi);
 
         return (f * f + dp_dr * dp_dr + dp_dz * dp_dz) * r2 /
@@ -93,7 +94,7 @@ int main() {
         double dp_dz = flux_function.derivative(pt, {0, 1});
         double r = pt.x();
         pt -= g_file_data.magnetic_axis;
-        double r2 = pt.__L2_norm_square();
+        double r2 = pt.L2_norm_square_();
 
         return r * r2 / (dp_dr * pt.x() + dp_dz * pt.y());
     };
@@ -152,9 +153,42 @@ int main() {
                               g_file_data.f_pol[0]);
         tc.push_back(0.);
     }
+
+#ifdef _DEBUG
+    for (size_t ri = 0; ri < contours.size(); ++ri) {
+        double psi = static_cast<double>(ri + 1) * flux_delta +
+                     g_file_data.flux_magnetic_axis;
+        // contour pt number + 1
+        const size_t poloidal_size = contours[ri].size() + 1;
+        std::vector<double> r_geo, z_geo, b2j_geo, bp_square_geo, bt_square_geo;
+        std::vector<double> geometric_angles{
+            g_file_data.geometric_poloidal_angles};
+        geometric_angles.push_back(geometric_angles.front() + 2 * M_PI);
+        std::vector<Contour::pt_type> contour_pts;
+        contour_pts.reserve(poloidal_size);
+
+        for (size_t i = 0; i < poloidal_size; ++i) {
+            contour_pts.push_back(contours[ri][i % (poloidal_size - 1)]);
+        }
+
+        intp::InterpolationFunction1D<Contour::pt_type> contour_intp(
+            intp::util::get_range(geometric_angles),
+            intp::util::get_range(contour_pts), 5, true);
+        auto psi_err_2 = [&](double t) {
+            return std::pow(flux_function(contour_intp(t)) - psi, 2);
+        };
+
+        std::cout << psi << " -> "
+                  << std::sqrt(util::integrate(psi_err_2, 0., 2 * M_PI) /
+                               (2 * M_PI)) /
+                         std::abs(psi)
+                  << '\n';
+    }
+#endif
+
     // iterate through contour
     for (size_t ri = 0; ri < contours.size(); ++ri) {
-        double psi = (ri + 1) * flux_delta;
+        double psi = static_cast<double>(ri + 1) * flux_delta;
         // contour pt number + 1
         const size_t poloidal_size = contours[ri].size() + 1;
         std::vector<double> r_geo, z_geo, b2j_geo, bp_square_geo, bt_square_geo;
@@ -221,7 +255,7 @@ int main() {
 
         // calculate necessary values on a even-spaced boozer grid
         for (size_t i = 0; i <= POLOIDAL_GRID_COUNT; ++i) {
-            double theta_boozer = i * theta_delta;
+            double theta_boozer = static_cast<double>(i) * theta_delta;
             double theta_geo =
                 i == 0 || i == POLOIDAL_GRID_COUNT
                     ? theta_boozer
@@ -282,8 +316,9 @@ int main() {
     for (size_t i = 0; i < normalized_toroidal_current.size(); ++i) {
         normalized_toroidal_current[i] =
             normalized_toroidal_current[i] / (B0 * R0) -
-            safety_factor_intp(i * flux_delta) *
-                normalized_poloidal_current_intp(i * flux_delta);
+            safety_factor_intp(static_cast<double>(i) * flux_delta) *
+                normalized_poloidal_current_intp(static_cast<double>(i) *
+                                                 flux_delta);
     }
     intp::InterpolationFunction1D<> normalized_toroidal_current_intp(
         std::make_pair(0., flux_wall), intp::util::get_range(tc), 2);
@@ -303,8 +338,9 @@ int main() {
     for (size_t i = 1; i < RADIAL_GRID_COUNT; ++i) {
         normalized_toroidal_flux.push_back(
             normalized_toroidal_flux.back() +
-            util::integrate_coarse(safety_factor_intp, flux_delta * (i - 1),
-                                   flux_delta * i));
+            util::integrate_coarse(safety_factor_intp,
+                                   flux_delta * static_cast<double>(i - 1),
+                                   flux_delta * static_cast<double>(i)));
     }
     intp::InterpolationFunction1D<> normalized_toroidal_flux_intp(
         std::make_pair(0., flux_wall),
@@ -338,7 +374,7 @@ int main() {
             for (size_t j = 0; j <= POLOIDAL_GRID_COUNT; ++j) {
                 os << std::setw(18)
                    << (i == 0
-                           ? f_2d(psi, theta_delta * j)
+                           ? f_2d(psi, theta_delta * static_cast<double>(j))
                            : coef * f_2d.derivative({psi, j * theta_delta},
                                                     {psi_order, theta_order}));
                 if (j % 4 == 3) { os << '\n'; }
@@ -351,17 +387,21 @@ int main() {
             size_t psi_order = i % 3;
             size_t theta_order = i / 3;
             for (size_t j = 0; j <= POLOIDAL_GRID_COUNT; ++j) {
-                double v1 = theta_order == 0
-                                ? f_2d(flux_delta, theta_delta * j) -
-                                      f_2d(0., theta_delta * j)
-                                : f_2d.derivative({flux_delta, theta_delta * j},
-                                                  {0, theta_order}) -
-                                      f_2d.derivative({0., theta_delta * j},
-                                                      {0, theta_order});
+                double v1 =
+                    theta_order == 0
+                        ? f_2d(flux_delta,
+                               theta_delta * static_cast<double>(j)) -
+                              f_2d(0., theta_delta * static_cast<double>(j))
+                        : f_2d.derivative({flux_delta, theta_delta * j},
+                                          {0, theta_order}) -
+                              f_2d.derivative({0., theta_delta * j},
+                                              {0, theta_order});
                 double v2 = f_2d.derivative({flux_delta, theta_delta * j},
                                             {1, theta_order});
                 std::array<double, 3> psi_coef{
-                    theta_order == 0 ? f_2d(0., theta_delta * j) : 0.,
+                    theta_order == 0
+                        ? f_2d(0., theta_delta * static_cast<double>(j))
+                        : 0.,
                     2. * (v1 - v2 * flux_delta) / std::sqrt(flux_delta),
                     -(v1 - 2. * v2 * flux_delta) / flux_delta};
                 os << std::setw(18)
@@ -389,18 +429,25 @@ int main() {
                 write_2d_coef_first_seg(sp_data, z_boozer_intp);
                 write_2d_coef_first_seg(sp_data, jacobian_boozer_intp);
             } else {
-                write_2d_coef(sp_data, magnetic_boozer_intp, i * flux_delta);
-                write_2d_coef(sp_data, r_boozer_intp, i * flux_delta);
-                write_2d_coef(sp_data, z_boozer_intp, i * flux_delta);
-                write_2d_coef(sp_data, jacobian_boozer_intp, i * flux_delta);
+                write_2d_coef(sp_data, magnetic_boozer_intp,
+                              static_cast<double>(i) * flux_delta);
+                write_2d_coef(sp_data, r_boozer_intp,
+                              static_cast<double>(i) * flux_delta);
+                write_2d_coef(sp_data, z_boozer_intp,
+                              static_cast<double>(i) * flux_delta);
+                write_2d_coef(sp_data, jacobian_boozer_intp,
+                              static_cast<double>(i) * flux_delta);
             }
-            write_1d_coef(sp_data, safety_factor_intp, i * flux_delta);
+            write_1d_coef(sp_data, safety_factor_intp,
+                          static_cast<double>(i) * flux_delta);
             write_1d_coef(sp_data, normalized_poloidal_current_intp,
-                          i * flux_delta);
+                          static_cast<double>(i) * flux_delta);
             write_1d_coef(sp_data, normalized_toroidal_current_intp,
-                          i * flux_delta);
-            write_1d_coef(sp_data, normalized_pressure_intp, i * flux_delta);
-            // r_minor has different definition of coefficient at first interval
+                          static_cast<double>(i) * flux_delta);
+            write_1d_coef(sp_data, normalized_pressure_intp,
+                          static_cast<double>(i) * flux_delta);
+            // r_minor has different definition of coefficient at first
+            // interval
             if (i == 0) {
                 double v1 = normalized_r_minor_intp(flux_delta);
                 double v2 = normalized_r_minor_intp.derivative({flux_delta}, 1);
@@ -409,10 +456,11 @@ int main() {
                 sp_data << std::setw(18) << 0. << std::setw(18) << c1
                         << std::setw(18) << c2 << '\n';
             } else {
-                write_1d_coef(sp_data, normalized_r_minor_intp, i * flux_delta);
+                write_1d_coef(sp_data, normalized_r_minor_intp,
+                              static_cast<double>(i) * flux_delta);
             }
             write_1d_coef(sp_data, normalized_toroidal_flux_intp,
-                          i * flux_delta);
+                          static_cast<double>(i) * flux_delta);
         }
         // TODO: ripple related
         sp_data << std::setw(4) << 0 << std::setw(4) << 0 << '\n';  // d0, brip

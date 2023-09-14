@@ -29,7 +29,7 @@ inline T abs(T x) {
 template <typename T>
 inline T arctan(T x, T y) {
     T atan = std::atan2(y, x);
-    return atan < 0 ? static_cast<T>(2 * M_PIl + atan) : atan;
+    return atan < 0 ? static_cast<T>(2 * static_cast<T>(M_PIl) + atan) : atan;
 }
 
 template <typename T>
@@ -58,7 +58,7 @@ void bracket(Func& func, Tx& a, Tx& b, Tx c, Tf& fa, Tf& fb, Tf& d, Tf& fd) {
     }
 
     Tf fc = func(c);
-    if (fc == 0) {
+    if (std::fpclassify(fc) == FP_ZERO) {
         a = c;
         fa = 0;
         d = 0;
@@ -115,7 +115,9 @@ Tx quadratic_interpolation(const Tx& a,
     Tf A = safe_div(Tf(fd - fb), Tf(d - b), std::numeric_limits<Tf>::max());
     A = safe_div(Tf(A - B), Tf(d - a), Tf(0));
 
-    if (A == 0) { return secant_interpolate(a, b, fa, fb); }
+    if (std::fpclassify(A) == FP_ZERO) {
+        return secant_interpolate(a, b, fa, fb);
+    }
 
     Tx c = sgn(A) * sgn(fa) > 0 ? a : b;
     for (unsigned i = 1; i <= count; ++i) {
@@ -158,9 +160,8 @@ Tx cubic_interpolation(const Tx& a,
  * from Boost library, ignoring most sanity checks.
  *
  * @tparam Tx input value type
- * @param func
- * @param a left staring point
- * @param b right starting point
+ * @param ax left staring point
+ * @param bx right starting point
  * @param tol a function accepting two value and determining them being within
  * tolerance
  */
@@ -171,7 +172,7 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
 
     const unsigned max_iter = 50;
     unsigned count = max_iter;
-    static const Tf mu = 0.5f;
+    static const Tf mu{.5l};
 
     if (ax >= bx) { throw std::domain_error("Given interval do not exist."); }
 
@@ -182,17 +183,20 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
         throw std::domain_error("Given interval may not bracket a root.");
     }
 
-    if (tol(a, b) || (fa == 0) || (fb == 0)) { return fb == 0 ? b : a; }
+    if (tol(a, b) || (std::fpclassify(fa) == FP_ZERO) ||
+        (std::fpclassify(fb) == FP_ZERO)) {
+        return std::fpclassify(fb) == FP_ZERO ? b : a;
+    }
 
     Tx d = 0;
-    Tx e = 1e5F;
-    Tf fe = 1e5F;
-    Tf fd = 1e5F;
+    Tx e{1.e5l};
+    Tf fe{1.e5l};
+    Tf fd{1.e5l};
 
     Tx c = detail::secant_interpolate(a, b, fa, fb);
     detail::bracket(func, a, b, c, fa, fb, d, fd);
     --count;
-    if (count != 0 && (fa != 0) && !(tol(a, b))) {
+    if (count != 0 && (std::fpclassify(fa) != FP_ZERO) && !(tol(a, b))) {
         c = detail::quadratic_interpolation(a, b, d, fa, fb, fd, 2);
         e = d;
         fe = fd;
@@ -203,7 +207,7 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
     Tf min_diff = std::numeric_limits<Tf>::min() * 32;
     Tx u;
     Tf fu;
-    while (count != 0 && (fa != 0) && !tol(a, b)) {
+    while (count != 0 && (std::fpclassify(fa) != FP_ZERO) && !tol(a, b)) {
         Tx a0 = a;
         Tx b0 = b;
 
@@ -219,7 +223,9 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
         e = d;
         fe = fd;
         detail::bracket(func, a, b, c, fa, fb, d, fd);
-        if ((0 == --count) || (fa == 0) || tol(a, b)) { break; }
+        if ((0 == --count) || (std::fpclassify(fa) == FP_ZERO) || tol(a, b)) {
+            break;
+        }
 
         prof = (util::abs(fa - fb) < min_diff) ||
                (util::abs(fa - fd) < min_diff) ||
@@ -231,7 +237,9 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
                  : detail::cubic_interpolation(a, b, d, e, fa, fb, fd, fe);
 
         detail::bracket(func, a, b, c, fa, fb, d, fd);
-        if ((0 == --count) || (fa == 0) || tol(a, b)) { break; }
+        if ((0 == --count) || (std::fpclassify(fa) == FP_ZERO) || tol(a, b)) {
+            break;
+        }
 
         if (util::abs(fa) < util::abs(fb)) {
             u = a;
@@ -246,7 +254,9 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
         e = d;
         fe = fd;
         detail::bracket(func, a, b, c, fa, fb, d, fd);
-        if ((0 == --count) || (fa == 0) || tol(a, b)) { break; }
+        if ((0 == --count) || (std::fpclassify(fa) == FP_ZERO) || tol(a, b)) {
+            break;
+        }
 
         if ((b - a) < mu * (b0 - a0)) { continue; }
 
@@ -259,18 +269,12 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
 #ifdef _DEBUG
     std::cout << "[DEBUG] Iterate " << max_iter - count << " times.\n";
 #endif
-    return fb == 0 ? b : a;
+    return std::fpclassify(fb) == FP_ZERO ? b : a;
 }
 
 /**
  * @brief Find root of a function using TOMS748, with default tolerance function
  *
- * @tparam Func
- * @tparam Tx
- * @param func
- * @param ax
- * @param bx
- * @return Tx
  */
 template <typename Func, typename Tx>
 Tx find_root(const Func& func, const Tx& ax, const Tx& bx) {
@@ -284,10 +288,6 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx) {
  * @brief Find root of $func(v) = field_val$ over vector by searching segment
  * between two given points
  *
- * @param func
- * @param v1
- * @param v2
- * @param field_val
  */
 template <typename Func, std::size_t D, typename T>
 Vec<D, T> vec_field_find_root(const Func& func,
@@ -295,7 +295,7 @@ Vec<D, T> vec_field_find_root(const Func& func,
                               const Vec<D, T>& v2,
                               T field_val = T{}) {
     T w = find_root(
-        [&](T w) { return func((T{1} - w) * v1 + w * v2) - field_val; }, T{},
+        [&](T w_) { return func((T{1} - w_) * v1 + w_ * v2) - field_val; }, T{},
         T{1});
     return (T{1} - w) * v1 + w * v2;
 }
@@ -307,7 +307,6 @@ namespace detail {
  * @brief The storage for abscissa and weight of order N Gauss-Kronrod
  * integration method. The data for N=5, 15 is precomputed.
  *
- * @tparam N
  */
 template <size_t N>
 struct gauss_kronrod_detail {
@@ -346,7 +345,7 @@ struct gauss_kronrod_detail<15> {
             0.94910791234275852,
             0.99145537112081264,
         };
-    };
+    }
     constexpr static std::array<double, 4> gauss_weight() {
         return {
             0.41795918367346939,
@@ -369,8 +368,6 @@ struct gauss_kronrod_detail<15> {
  * @brief Order N Gauss-Kronrod quadrature, with embedded Gauss quadrature order
  * = (N-1)/2
  *
- * @tparam N
- * @tparam Tx
  */
 template <size_t N, typename Tx>
 struct gauss_kronrod : gauss_kronrod_detail<N> {
@@ -381,7 +378,6 @@ struct gauss_kronrod : gauss_kronrod_detail<N> {
      * given function on [-1, 1].
      *
      * @tparam Func Function type
-     * @tparam Tx Abscissa type
      * @param func Integrand
      * @return a pair of integral and err
      */
@@ -426,7 +422,9 @@ struct gauss_kronrod : gauss_kronrod_detail<N> {
         auto result = gauss_kronrod_basic(normalize_func);
         auto integral = result.first * scale;
         auto err = result.second * scale;
-        if (local_abs_tol == 0) { local_abs_tol = global_rel_tol * integral; }
+        if (std::fpclassify(local_abs_tol) == FP_ZERO) {
+            local_abs_tol = global_rel_tol * integral;
+        }
 
         if (max_subdivide > 0 && err > local_abs_tol &&
             err > global_rel_tol * integral) {

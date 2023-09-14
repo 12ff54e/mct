@@ -32,12 +32,12 @@ class Vec_base {
 
     template <typename... Ts,
               typename = typename std::enable_if<sizeof...(Ts) == dim>::type>
-    constexpr Vec_base(Ts... vs) noexcept : coord{(value_type)vs...} {}
+    constexpr Vec_base(Ts... vs) noexcept
+        : coord{static_cast<value_type>(vs)...} {}
 
     /**
      * @brief Conversion constructor from supported type
      *
-     * @tparam U
      * @param other another vec
      */
     template <typename U,
@@ -57,18 +57,23 @@ class Vec_base {
 
     // element access
 
-    T& operator[](int i) noexcept { return coord[i]; }
+    T& operator[](std::size_t i) noexcept { return coord[i]; }
 
-    const T& operator[](int i) const noexcept { return coord[i]; }
+    const T& operator[](std::size_t i) const noexcept { return coord[i]; }
 
     // comparison operations
 
 #if __cplusplus >= 202002L
     friend bool operator==(const vec_type& lhs, const vec_type& rhs) {
         auto equal_aux = []<std::size_t... indices>(
-            std::index_sequence<indices...>, const vec_type& lhs,
-            const vec_type& rhs) {
-            return (... && (lhs[indices] == rhs[indices]));
+                             std::index_sequence<indices...>,
+                             const vec_type& lhs_, const vec_type& rhs_) {
+            if constexpr (std::is_arithmetic_v<typename vec_type::value_type>) {
+                return (... && (std::fpclassify(lhs_[indices] -
+                                                rhs_[indices]) == FP_ZERO));
+            } else {
+                return (... && (lhs_[indices] == rhs_[indices]));
+            }
         };
         return equal_aux(std::make_index_sequence<dim>{}, lhs, rhs);
     }
@@ -141,13 +146,13 @@ class Vec_base {
 
     // properties
 
-    T __L2_norm_square() const {
+    T L2_norm_square_() const {
         T norm{};
         for (auto& c : coord) { norm += c * c; }
         return norm;
     }
 
-    T mag() const { return std::sqrt(__L2_norm_square()); }
+    T mag() const { return std::sqrt(L2_norm_square_()); }
 };
 
 /**
@@ -215,9 +220,10 @@ template <std::size_t D, typename T = double>
 T dot(const Vec<D, T>& v1, const Vec<D, T>& v2) {
 #if __cplusplus >= 202002L
     auto dot_aux = []<std::size_t... indices>(
-        std::index_sequence<indices...>, const Vec<sizeof...(indices), T>& v1,
-        const Vec<sizeof...(indices), T>& v2) {
-        return (... + (v1[indices] * v2[indices]));
+                       std::index_sequence<indices...>,
+                       const Vec<sizeof...(indices), T>& v1_,
+                       const Vec<sizeof...(indices), T>& v2_) {
+        return (... + (v1_[indices] * v2_[indices]));
     };
 #endif
     using namespace vec_impl;

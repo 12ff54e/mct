@@ -13,8 +13,8 @@ class Contour {
     using pt_type = Vec<2, double>;
 
    private:
-    std::vector<pt_type> pts;
-    const GFileRawData& g_file;
+    std::vector<pt_type> pts_;
+    const GFileRawData& g_file_;
 
    public:
     Contour(double,
@@ -44,7 +44,7 @@ template <typename Field, typename Measure>
 double Contour::definite_integrate_along(Field f, Measure s) {
     // sort contour pts according to measure
     std::sort(
-        pts.begin(), pts.end(),
+        pts_.begin(), pts_.end(),
         [&](const pt_type& p1, const pt_type& p2) { return s(p1) < s(p2); });
 
     std::vector<double> abscissa;
@@ -77,22 +77,22 @@ intp::InterpolationFunction1D<double> Contour::indefinite_integrate_along(
     std::vector<double> ordinate;
     ordinate.reserve(size() + 1);
 
-    for (auto& pt : pts) { ordinate.emplace_back(f(pt)); }
+    for (auto& pt : pts_) { ordinate.emplace_back(f(pt)); }
 
     // last point being identical to the first one required for periodic
     // interpolation
 
     ordinate.push_back(ordinate.front());
     std::vector<double> abscissa;
-    if (g_file.geometric_poloidal_angles.front() == 0) {
+    if (std::fpclassify(g_file_.geometric_poloidal_angles.front()) == FP_ZERO) {
         abscissa.reserve(size() + 1);
     } else {
         abscissa.reserve(size() + 2);
         abscissa.push_back(0);
     }
-    abscissa.insert(abscissa.end(), g_file.geometric_poloidal_angles.begin(),
-                    g_file.geometric_poloidal_angles.end());
-    abscissa.push_back(g_file.geometric_poloidal_angles.front() + 2 * M_PI);
+    abscissa.insert(abscissa.end(), g_file_.geometric_poloidal_angles.begin(),
+                    g_file_.geometric_poloidal_angles.end());
+    abscissa.push_back(g_file_.geometric_poloidal_angles.front() + 2 * M_PI);
 
     intp::InterpolationFunction1D<double> f_interp(
         std::make_pair(std::next(abscissa.begin()), abscissa.end()),
