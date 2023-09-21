@@ -13,6 +13,7 @@ class Contour {
     using pt_type = Vec<2, double>;
 
    private:
+    const double flux_;
     std::vector<pt_type> pts_;
     const GFileRawData& g_file_;
 
@@ -24,6 +25,8 @@ class Contour {
     // properties
 
     size_t size() const noexcept;
+
+    double flux() const noexcept;
 
     // element access
 
