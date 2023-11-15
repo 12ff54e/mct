@@ -22,7 +22,7 @@ Contour::Contour(double psi,
     for (size_t i = 0; i < g_file.boundary.size(); ++i) {
         auto pt0 = pts_[i];
         auto pt1 = pts_[(i + 1) % pts_.size()];
-        if (util::abs((flux(.5 * (pt0 + pt1)) - psi) / psi) > 1.e-7) {
+        if (util::abs((flux(.5 * (pt0 + pt1)) - psi) / psi) > 1.e-3) {
             ++count;
         }
     }

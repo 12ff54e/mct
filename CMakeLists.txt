@@ -20,7 +20,7 @@ endif()
 include_directories(./deps)
 add_compile_definitions($<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:_DEBUG>)
 
-list(APPEND src_files main.cpp Contour.cpp GFileRawData.cpp)
+list(APPEND src_files main.cpp Contour.cpp GFileRawData.cpp Spdata.cpp)
 list(TRANSFORM src_files PREPEND src/)
 add_executable(mct ${src_files})
 

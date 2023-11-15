@@ -11,3 +11,7 @@ cmake --build ./build
 # convert specified gfile to spdata.dat
 ./build/mct file-path-to-gfile
 ```
+
+## Known Issue
+
+* Can not deal with negative poloidal current

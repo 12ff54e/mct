@@ -89,7 +89,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     // p^{\prime}
     read_vec(g.nw, g.p_prime);
     if (is.fail()) {
-        std::cout << "Data corruption at p*p'.\n";
+        std::cout << "Data corruption at p'.\n";
         return is;
     }
     // flux

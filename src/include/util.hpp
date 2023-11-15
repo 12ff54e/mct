@@ -266,8 +266,8 @@ Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
         --count;
     }
 
-#ifdef _DEBUG
-    std::cout << "[DEBUG] Iterate " << max_iter - count << " times.\n";
+#ifdef _TRACE
+    std::cout << "[TRACE] Iterate " << max_iter - count << " times.\n";
 #endif
     return std::fpclassify(fb) == FP_ZERO ? b : a;
 }
@@ -434,8 +434,8 @@ struct gauss_kronrod : gauss_kronrod_detail<N> {
                                           local_abs_tol / 2, global_rel_tol);
         }
 
-#ifdef _DEBUG
-        std::cout << "[DEBUG] Gauss-Kronrod subdivide stopped at [" << a << ", "
+#ifdef _TRACE
+        std::cout << "[TRACE] Gauss-Kronrod subdivide stopped at [" << a << ", "
                   << b << "] with max_subdivide = " << max_subdivide
                   << ", err = " << err << '\n';
 #endif
