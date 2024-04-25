@@ -27,6 +27,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     }
     // 2nd line
     std::getline(is, line);
+    ss_line.clear();
     ss_line.str(line);
     ss_line >> g.dim.x() >> g.dim.y() >> g.r_center >> g.r_left >> g.z_mid;
     if (ss_line.fail()) {
@@ -35,6 +36,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     }
     // 3rd line
     std::getline(is, line);
+    ss_line.clear();
     ss_line.str(line);
     ss_line >> g.magnetic_axis.x() >> g.magnetic_axis.y() >>
         g.flux_magnetic_axis >> g.flux_LCFS >> g.b_center;
@@ -44,6 +46,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     }
     // 4th line
     std::getline(is, line);
+    ss_line.clear();
     ss_line.str(line);
     ss_line >> g.current >> d_dum >> d_dum >> d_dum >> d_dum;
     if (ss_line.fail()) {
@@ -52,6 +55,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     }
     // 5th line
     std::getline(is, line);
+    ss_line.clear();
     ss_line.str(line);
     ss_line >> d_dum >> d_dum >> g.flux_sep >> g.sep.x() >> g.sep.y();
     if (ss_line.fail()) {
