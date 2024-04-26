@@ -1,4 +1,5 @@
 #include <iomanip>
+#include <limits>
 
 #include "include/Contour.hpp"
 #include "include/Spdata.hpp"
@@ -209,11 +210,15 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
 
     std::vector<double> poloidal_angles{g_file_data.geometric_poloidal_angles};
     poloidal_angles.push_back(poloidal_angles.front() + PI2);
-    // \\theta range: \\theta_0, ..., \\theta0 + 2\\pi
+    // \\theta range: \\theta_0, ..., \\theta_0 + 2\\pi
     intp::InterpolationFunctionTemplate1D<> poloidal_template{
         intp::util::get_range(poloidal_angles), poloidal_angles.size(), 5,
         true};
-    poloidal_angles.insert(poloidal_angles.begin(), 0);
+
+    if (std::fpclassify(poloidal_angles.front()) != FP_ZERO) {
+        poloidal_angles.insert(poloidal_angles.begin(), 0);
+    }
+
     poloidal_angles.back() = PI2;
     // \\theta range: 0, ..., 2\\pi
     intp::InterpolationFunctionTemplate1D<> poloidal_template_full{
