@@ -9,6 +9,8 @@
 #include "Vec.hpp"
 
 struct GFileRawData {
+    std::array<char, 48> metadata;
+    std::string extra_metadata;
     std::string code_name;
     std::string date;
     std::string shot_id;

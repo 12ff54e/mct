@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
 
@@ -14,17 +15,27 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     std::string line;
     std::stringstream ss_line;
     double d_dum;
-    // 1st line
+    // 1st line, extarcted with a fixed width style to avoid peculiar layout
+    // causing problems
     std::getline(is, line);
     ss_line.str(line);
-    ss_line >> g.code_name >> g.date >> s_dum;
-    ss_line >> g.shot_id >> g.time >> s_dum;
-    if (ss_line.tellg() < 51) { ss_line >> s_dum; }
-    ss_line >> g.nw >> g.nh;
+    ss_line.read(g.metadata.begin(), 48);
+    char str_tmp[4];
+    ss_line.read(str_tmp, 4);
+    ss_line.read(str_tmp, 4);
+    g.nw = atoi(str_tmp);
+    ss_line.read(str_tmp, 4);
+    g.nh = atoi(str_tmp);
+    if (!ss_line.eof()) {
+        // There is extra metadata
+        g.extra_metadata =
+            std::string(std::istreambuf_iterator<char>(ss_line), {});
+    }
     if (ss_line.fail()) {
         std::cout << "Data corruption at 1st line.\n";
         return is;
     }
+
     // 2nd line
     std::getline(is, line);
     ss_line.clear();
