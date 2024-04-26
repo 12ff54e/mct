@@ -11,6 +11,14 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+class TimeLog {
+   public:
+    TimeLog() = default;
+
+   private:
+    std::chrono::high_resolution_clock::time_point tp;
+};
+
 int main(int argc, char** argv) {
     using namespace std::chrono;
 

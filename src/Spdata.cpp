@@ -244,7 +244,16 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
 
     const double B0 = b_field(g_file_data.magnetic_axis, 0.);
     const double R0 = g_file_data.magnetic_axis.x();
-    const double flux_unit = B0 * R0 * R0;
+
+    // This two basic unit determines the output spdata unit,
+    // setting them to 1 means SI unit.
+    const double length_unit = R0;
+    const double magnetic_field_unit = B0;
+
+    const double current_unit = length_unit * magnetic_field_unit;
+    const double pressure_unit =
+        magnetic_field_unit * magnetic_field_unit / magnetic_constant;
+    const double flux_unit = length_unit * length_unit * magnetic_field_unit;
 
     // construct boozer coordinate, integrate B^2 * J along each contour
 
@@ -300,7 +309,7 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
                                                       poloidal_angles[i]));
         }
         auto coef = b2j_int.back() / PI2;
-        tor_current_n.push_back(bp2j_int.back() / (PI2 * R0 * B0));
+        tor_current_n.push_back(bp2j_int.back() / (PI2 * current_unit));
         // normalization
         for (auto& v : b2j_int) { v /= coef; }
         auto boozer_geo_intp =
@@ -318,17 +327,19 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
 
             // be careful of normalization
 
-            magnetic_boozer(ri, i) = b_field({r_grid, z_grid}, psi) / B0;
-            r_boozer(ri, i) = r_grid / R0;
+            magnetic_boozer(ri, i) =
+                b_field({r_grid, z_grid}, psi) / magnetic_field_unit;
+            r_boozer(ri, i) = r_grid / length_unit;
             // z value is shifted such that magnetic axis has z = 0
-            z_boozer(ri, i) = (z_grid - g_file_data.magnetic_axis.y()) / R0;
-            jacobian_boozer(ri, i) = j_field({r_grid, z_grid}, psi) / R0 * B0;
+            z_boozer(ri, i) =
+                (z_grid - g_file_data.magnetic_axis.y()) / length_unit;
+            jacobian_boozer(ri, i) = j_field({r_grid, z_grid}, psi) *
+                                     magnetic_field_unit / length_unit;
         }
 
         safety_factor.push_back(safety_factor_intp(psi));
-        pol_current_n.push_back(poloidal_current_intp(psi) / (B0 * R0));
-        pressure_n.push_back(pressure_intp(psi) * magnetic_constant /
-                             (B0 * B0));
+        pol_current_n.push_back(poloidal_current_intp(psi) / current_unit);
+        pressure_n.push_back(pressure_intp(psi) / pressure_unit);
         tor_flux_n.push_back(
             (ri == 0 ? 0. : tor_flux_n.back()) +
             util::integrate_coarse(safety_factor_intp,
@@ -340,14 +351,15 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
         r_minor_n.push_back(std::sqrt(2. * tor_flux_n.back()));
     }
     const double q0 = safety_factor_intp(0);
-    const double g0n = poloidal_current_intp(0) / (B0 * R0);
-    const double p0n = pressure_intp(0) * magnetic_constant / (B0 * B0);
+    const double b0n = B0 / magnetic_field_unit;
+    const double g0n = poloidal_current_intp(0) / current_unit;
+    const double p0n = pressure_intp(0) / pressure_unit;
     return SpdataRaw_{{std::move(magnetic_boozer), std::move(r_boozer),
                        std::move(z_boozer), std::move(jacobian_boozer)},
                       {std::move(safety_factor), std::move(pol_current_n),
                        std::move(tor_current_n), std::move(pressure_n),
                        std::move(r_minor_n), std::move(tor_flux_n)},
-                      {1., 1., 0., q0 * g0n},
+                      {b0n, R0 / length_unit, 0., q0 * g0n / (b0n * b0n)},
                       {q0, g0n, 0., p0n, 0., 0.},
                       flux_unit};
 }
