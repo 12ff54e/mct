@@ -348,9 +348,9 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
                                               g_file_data.flux_magnetic_axis),
                                    psi) /
                 flux_unit);
+        // r_minor defined as distance from magnetic axis at weak field side
         // this value is always normalized to R0
-        r_minor_n.push_back(std::sqrt(2. * tor_flux_n.back() * flux_unit / B0) /
-                            R0);
+        r_minor_n.push_back(r_geo_intp(0.) / R0 - 1.);
     }
     const double q0 = safety_factor_intp(0);
     const double b0n = B0 / magnetic_field_unit;
