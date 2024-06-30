@@ -57,32 +57,29 @@ struct CLAP {
 
         for (int i = 1; i < argc; ++i) {
             std::string option{argv[i]};
-            bool valid_option = false;
-            for (auto&& [key, config] : get_parameter_map()) {
-                if (option != key) { continue; }
-                auto [offset, type_code] = config;
-                std::string raw_value;
-                if (type_code == TYPE_CODE::bool_t) {
-                    raw_value = "1";
-                } else if (i + 1 == argc) {
-                    std::ostringstream oss;
-                    oss << argv[0] << ": missing value of option '" << argv[i]
-                        << "'\n";
-                    throw std::invalid_argument(oss.str());
-                } else {
-                    raw_value = argv[++i];
-                }
-                assign_value(reinterpret_cast<char*>(&input) + offset,
-                             type_code, raw_value);
-
-                valid_option = true;
-                break;
-            }
-            if (!valid_option) {
+            const auto& pm = get_parameter_map();
+            auto iter = pm.find(option);
+            if (iter == pm.end()) {
                 std::ostringstream oss;
-                oss << argv[0] << ": invalid option '" << argv[i] << "'\n";
+                oss << argv[0] << ": unrecognized option '" << option << "'\n";
                 throw std::invalid_argument(oss.str());
             }
+
+            // valid option
+            auto [offset, type_code] = iter->second;
+            std::string raw_value;
+            if (type_code == TYPE_CODE::bool_t) {
+                raw_value = "1";
+            } else if (i + 1 == argc) {
+                std::ostringstream oss;
+                oss << argv[0] << ": missing value of option '" << argv[i]
+                    << "'\n";
+                throw std::invalid_argument(oss.str());
+            } else {
+                raw_value = argv[++i];
+            }
+            assign_value(reinterpret_cast<char*>(&input) + offset, type_code,
+                         raw_value);
         }
     }
 #undef TYPE_LIST

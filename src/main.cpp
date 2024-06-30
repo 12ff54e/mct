@@ -36,7 +36,12 @@ int main(int argc, char** argv) {
     CLAP_END(Input)
 
     Input config;
-    CLAP<Input>::parse_input(config, argc, argv);
+    try {
+        CLAP<Input>::parse_input(config, argc, argv);
+    } catch (std::exception& e) {
+        std::cerr << e.what();
+        return EINVAL;
+    }
 
     const auto& filename = config.input_path;
     std::ifstream g_file(filename);
