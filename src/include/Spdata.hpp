@@ -66,6 +66,7 @@ class Spdata {
     Spdata(const GFileRawData&,
            std::size_t,
            std::size_t,
+           bool = false,
            std::size_t = 256,
            double = .99);
 
@@ -75,6 +76,8 @@ class Spdata {
     // interpolation order of internal use
     constexpr static std::size_t ORDER_ = 5;
     constexpr static std::size_t ORDER_OUT_ = 2;
+
+    const bool use_si_;
     const std::size_t lsp_, lst_;
     const double psi_delta_;
     const double theta_delta_;
