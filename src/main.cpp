@@ -16,10 +16,11 @@
 #endif
 
 struct Input {
+    bool use_SI;
+    unsigned radial_grid_count;
+    unsigned poloidal_grid_count;
     std::string input_path;
     std::string output_path;
-    int radial_grid_count;
-    int poloidal_grid_count;
 };
 
 int main(int argc, char** argv) {
@@ -31,6 +32,7 @@ int main(int argc, char** argv) {
     CLAP_REGISTER(output_path, "--output-path")
     CLAP_REGISTER(radial_grid_count, "--radial")
     CLAP_REGISTER(poloidal_grid_count, "--poloidal")
+    CLAP_REGISTER(use_SI, "--use-si")
     CLAP_END(Input)
 
     Input config;

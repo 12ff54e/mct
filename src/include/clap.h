@@ -5,21 +5,30 @@
 #include <type_traits>
 #include <unordered_map>
 
-enum class TYPE_CODE { int_t, double_t, string_t };
+#define TYPE_LIST()        \
+    PROCESS_TYPE(bool)     \
+    PROCESS_TYPE(int)      \
+    PROCESS_TYPE(unsigned) \
+    PROCESS_TYPE(double)   \
+    PROCESS_TYPE(string)
+
+enum class TYPE_CODE {
+#define PROCESS_TYPE(TYPE) TYPE##_t,
+    TYPE_LIST()
+#undef PROCESS_TYPE
+};
 
 template <typename T>
 struct CLAP {
     using base = T;
     using string = std::string;
 
-    static inline std::unordered_map<std::string,
-                                     std::pair<std::size_t, TYPE_CODE>>
-        parameter_map{};
-
-#define TYPE_LIST()      \
-    PROCESS_TYPE(int)    \
-    PROCESS_TYPE(double) \
-    PROCESS_TYPE(string)
+    static auto& get_parameter_map() {
+        static std::unordered_map<std::string,
+                                  std::pair<std::size_t, TYPE_CODE>>
+            parameter_map{};
+        return parameter_map;
+    }
 
     template <typename Arg>
     static TYPE_CODE get_type_code() {
@@ -49,21 +58,25 @@ struct CLAP {
         for (int i = 1; i < argc; ++i) {
             std::string option{argv[i]};
             bool valid_option = false;
-            for (auto&& [key, config] : parameter_map) {
-                if (option == key) {
-                    if (++i == argc) {
-                        std::ostringstream oss;
-                        oss << argv[0] << ": missing value of option '"
-                            << argv[i - 1] << "'\n";
-                        throw std::invalid_argument(oss.str());
-                    }
-                    std::string raw_value{argv[i]};
-                    assign_value(reinterpret_cast<char*>(&input) + config.first,
-                                 config.second, raw_value);
-
-                    valid_option = true;
-                    break;
+            for (auto&& [key, config] : get_parameter_map()) {
+                if (option != key) { continue; }
+                auto [offset, type_code] = config;
+                std::string raw_value;
+                if (type_code == TYPE_CODE::bool_t) {
+                    raw_value = "1";
+                } else if (i + 1 == argc) {
+                    std::ostringstream oss;
+                    oss << argv[0] << ": missing value of option '" << argv[i]
+                        << "'\n";
+                    throw std::invalid_argument(oss.str());
+                } else {
+                    raw_value = argv[++i];
                 }
+                assign_value(reinterpret_cast<char*>(&input) + offset,
+                             type_code, raw_value);
+
+                valid_option = true;
+                break;
             }
             if (!valid_option) {
                 std::ostringstream oss;
@@ -87,14 +100,14 @@ struct CLAP {
 
 #define CLAP_REGISTER_DIRECT(NAME)                                        \
     {                                                                     \
-        parameter_map.emplace(                                            \
+        get_parameter_map().emplace(                                      \
             "--" #NAME, std::make_pair(offsetof(base, NAME),              \
                                        get_type_code<decltype(NAME)>())); \
     }
 
 #define CLAP_REGISTER_EXTEND(NAME, OPTION_NAME)                            \
     {                                                                      \
-        parameter_map.emplace(                                             \
+        get_parameter_map().emplace(                                       \
             OPTION_NAME, std::make_pair(offsetof(base, NAME),              \
                                         get_type_code<decltype(NAME)>())); \
     }
