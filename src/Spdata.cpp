@@ -7,9 +7,11 @@
 Spdata::Spdata(const GFileRawData& g_file_data,
                std::size_t radial_grid_num,
                std::size_t poloidal_grid_num,
+               bool use_si,
                std::size_t radial_sample,
                double psi_ratio)
-    : lsp_(radial_grid_num),
+    : use_si_(use_si),
+      lsp_(radial_grid_num),
       lst_(poloidal_grid_num),
       psi_delta_(psi_ratio *
                  (g_file_data.flux_LCFS - g_file_data.flux_magnetic_axis) /
@@ -247,8 +249,8 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
 
     // This two basic unit determines the output spdata unit,
     // setting them to 1 means SI unit.
-    const double length_unit = R0;
-    const double magnetic_field_unit = B0;
+    const double length_unit = use_si_ ? 1. : R0;
+    const double magnetic_field_unit = use_si_ ? 1. : B0;
 
     const double current_unit = length_unit * magnetic_field_unit;
     const double pressure_unit =

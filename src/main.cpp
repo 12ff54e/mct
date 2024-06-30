@@ -1,4 +1,5 @@
 #include <cerrno>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 
@@ -36,11 +37,23 @@ int main(int argc, char** argv) {
     CLAP_END(Input)
 
     Input config;
+    config.use_SI = false;
+    config.radial_grid_count = 129;
+    config.poloidal_grid_count = 255;
     try {
         CLAP<Input>::parse_input(config, argc, argv);
     } catch (std::exception& e) {
         std::cerr << e.what();
         return EINVAL;
+    }
+
+    if (config.input_path.empty()) {
+        std::cerr << "Please provide input file.";
+        return ENOENT;
+    }
+    if (config.output_path.empty()) {
+        config.output_path =
+            (std::filesystem::current_path() / "spdata.dat").string();
     }
 
     const auto& filename = config.input_path;
@@ -58,7 +71,7 @@ int main(int argc, char** argv) {
     timer.pause_last_and_start_next("Generate BSpline");
 
     Spdata spdata(g_file_data, config.radial_grid_count,
-                  config.poloidal_grid_count);
+                  config.poloidal_grid_count, config.use_SI);
 
     timer.pause_last_and_start_next("Write to spdata ");
 
