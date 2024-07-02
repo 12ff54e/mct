@@ -30,10 +30,16 @@ int main(int argc, char** argv) {
 
     CLAP_BEGIN(Input)
     CLAP_REGISTER_ARG(input_path)
-    CLAP_REGISTER_OPTION(output_path, "--output-path")
-    CLAP_REGISTER_OPTION(radial_grid_count, "--radial")
-    CLAP_REGISTER_OPTION(poloidal_grid_count, "--poloidal")
-    CLAP_REGISTER_OPTION(use_SI, "--use-si")
+    CLAP_REGISTER_OPTION_WITH_DESCRIPTION(
+        output_path, "--output-path", "-o",
+        "specify the path of output file, default to '$PWD/spdata.dat'")
+    CLAP_REGISTER_OPTION_WITH_DESCRIPTION(radial_grid_count, "--radial", "-r",
+                                          "radial grid number")
+    CLAP_REGISTER_OPTION_WITH_DESCRIPTION(poloidal_grid_count, "--poloidal",
+                                          "-p", "poloidal grid number")
+    CLAP_REGISTER_OPTION_WITH_DESCRIPTION(
+        use_SI, "--use-si",
+        "output with SI unit instead of normalized to B_0 and R_0")
     CLAP_END(Input)
 
     Input config;
