@@ -437,7 +437,8 @@ struct gauss_kronrod : gauss_kronrod_detail<N> {
             if (std::fpclassify(abs_tol) == FP_ZERO) {
                 abs_tol = std::abs(global_rel_tol * integral);
             }
-            if (std::ldexp(scale, max_subdivide) > 0.99 * (b - a) &&
+            if (std::ldexp(scale, static_cast<int>(max_subdivide)) >
+                    0.99 * (b - a) &&
                 err > abs_tol * inv_scale &&
                 err > std::abs(global_rel_tol * integral)) {
                 pending_intervals.push_back({mid, r});

@@ -23,9 +23,9 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     char str_tmp[4];
     ss_line.read(str_tmp, 4);
     ss_line.read(str_tmp, 4);
-    g.nw = atoi(str_tmp);
+    g.nw = static_cast<unsigned>(atoi(str_tmp));
     ss_line.read(str_tmp, 4);
-    g.nh = atoi(str_tmp);
+    g.nh = static_cast<unsigned>(atoi(str_tmp));
     if (!ss_line.eof()) {
         // There is extra metadata
         g.extra_metadata =
