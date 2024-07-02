@@ -104,21 +104,18 @@ struct CLAP {
                 std::size_t offset{};
                 TYPE_CODE type_code{};
                 bool invalid_option = false;
+                auto iter = get_options().cbegin();
                 if (option_or_arg[1] == '-') {
                     // it's an long option
                     const auto& opts = get_options();
-                    auto iter = opts.find(option_or_arg);
-                    if (!(invalid_option = iter == opts.end())) {
-                        offset = iter->second.offset;
-                        type_code = iter->second.type_code;
-                    }
+                    iter = opts.find(option_or_arg);
+                    invalid_option = iter == opts.end();
                 } else {
                     // it's an short option
                     auto& short_opts = get_short_name_map();
-                    auto iter = short_opts.find(option_or_arg);
-                    if (!(invalid_option = iter == short_opts.end())) {
-                        offset = iter->second->second.offset;
-                        type_code = iter->second->second.type_code;
+                    auto iter_short = short_opts.find(option_or_arg);
+                    if (!(invalid_option = iter_short == short_opts.end())) {
+                        iter = iter_short->second;
                     }
                 }
                 if (invalid_option) {
@@ -126,6 +123,9 @@ struct CLAP {
                     oss << argv[0] << ": unrecognized option '" << option_or_arg
                         << "'\n";
                     throw std::invalid_argument(oss.str());
+                } else {
+                    offset = iter->second.offset;
+                    type_code = iter->second.type_code;
                 }
 
                 std::string raw_value;
