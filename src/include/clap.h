@@ -58,6 +58,16 @@ struct CLAP {
         return arguments;
     }
 
+    static auto& get_usage() {
+        static std::string usage;
+        return usage;
+    }
+
+    static auto& get_description() {
+        static std::string description;
+        return description;
+    }
+
     template <typename Arg>
     static TYPE_CODE get_type_code() {
 #define PROCESS_TYPE(TYPE) \
@@ -162,8 +172,8 @@ struct CLAP {
             for (std::size_t i = 0; i < n; ++i) { std::cout << ' '; }
         };
 
-        std::cout << "Usage: " << program_name << " [OPTION]... INPUT_FILE\n";
-        std::cout << "Transform g-file to spdata\n\n";
+        std::cout << "Usage: " << program_name << " " << get_usage() << '\n';
+        std::cout << get_description() << "\n\n";
         for (auto it : iters) {
             std::size_t col = 0;
             if (it->second.has_short_name()) {
@@ -202,16 +212,18 @@ struct CLAP {
     struct _clap_##NAME##_ : NAME, CLAP<NAME> { \
         using base = NAME;                      \
         static void define_parameters() {
-#define CLAP_END(NAME)                                                 \
-    auto result = get_options().emplace(                               \
-        "--help", OptionConfig{0, TYPE_CODE::int_t, "",                \
-                               "display this help message and exit"}); \
-    if (get_short_name_map().emplace("-h", result.first).second) {     \
-        result.first->second.short_name = "-h";                        \
-    }                                                                  \
-    }                                                                  \
-    }                                                                  \
-    ;                                                                  \
+#define CLAP_END(NAME)                                                     \
+    {                                                                      \
+        auto result = get_options().emplace(                               \
+            "--help", OptionConfig{0, TYPE_CODE::int_t, "",                \
+                                   "display this help message and exit"}); \
+        if (get_short_name_map().emplace("-h", result.first).second) {     \
+            result.first->second.short_name = "-h";                        \
+        }                                                                  \
+    }                                                                      \
+    }                                                                      \
+    }                                                                      \
+    ;                                                                      \
     _clap_##NAME##_::define_parameters();
 
 #define CLAP_REGISTER_OPT_MINIMAL(NAME)                                 \
@@ -287,5 +299,8 @@ struct CLAP {
         get_arguments().emplace_back(offsetof(base, NAME),             \
                                      get_type_code<decltype(NAME)>()); \
     }
+
+#define CLAP_ADD_USAGE(USAGE) get_usage() = USAGE;
+#define CLAP_ADD_DESCRIPTION(DESC) get_description() = DESC;
 
 #endif  // ZQ_CLAP

@@ -29,6 +29,8 @@ int main(int argc, char** argv) {
     timer.start("Read g-file");
 
     CLAP_BEGIN(Input)
+    CLAP_ADD_USAGE("[OPTION]... INPUT_FILE")
+    CLAP_ADD_DESCRIPTION("Transfrom g-file to spdata using in GTC.")
     CLAP_REGISTER_ARG(input_path)
     CLAP_REGISTER_OPTION_WITH_DESCRIPTION(
         output_path, "--output-path", "-o",
