@@ -170,7 +170,21 @@ struct CLAP {
                 if (invalid_option) {
                     std::ostringstream oss;
                     oss << argv[0] << ": unrecognized option '" << option_or_arg
-                        << "'\n";
+                        << "'\nTry '" << argv[0]
+                        << " --help' for more information.\n";
+                    std::size_t min_dist = 10;
+                    auto min_iter = opts.cbegin();
+                    for (auto it = opts.begin(); it != opts.end(); ++it) {
+                        auto dist = edit_distance(it->first, option_or_arg);
+                        if (dist < min_dist) {
+                            min_dist = dist;
+                            min_iter = it;
+                        }
+                    }
+                    if (min_dist < 3) {
+                        oss << "\n    Do you mean '" << min_iter->first
+                            << "'?\n";
+                    }
                     throw std::invalid_argument(oss.str());
                 } else {
                     offset = iter->second.offset;
@@ -190,7 +204,8 @@ struct CLAP {
                     } else if (i + 1 == argc) {
                         std::ostringstream oss;
                         oss << argv[0] << ": missing value of option '"
-                            << option_or_arg << "'\n";
+                            << option_or_arg << "'\nTry '" << argv[0]
+                            << " --help' for more information.\n";
                         throw std::invalid_argument(oss.str());
                     } else {
                         raw_value = argv[++i];
@@ -202,7 +217,9 @@ struct CLAP {
                 // it's an argument
                 if (argument_idx == get_arguments().size()) {
                     std::ostringstream oss;
-                    oss << argv[0] << ": too many arguments\n";
+                    oss << argv[0] << ": too many arguments\n"
+                        << "Try '" << argv[0]
+                        << " --help' for more information.\n";
                     throw std::invalid_argument(oss.str());
                 }
                 auto [offset, type_code] = get_arguments()[argument_idx];
@@ -213,7 +230,8 @@ struct CLAP {
         }
         if (argument_idx < get_arguments().size()) {
             std::ostringstream oss;
-            oss << argv[0] << ": too few arguments\n";
+            oss << argv[0] << ": too few arguments\n"
+                << "Try '" << argv[0] << " --help' for more information.\n";
             throw std::invalid_argument(oss.str());
         }
     }
@@ -290,6 +308,27 @@ struct CLAP {
         (void)option_name;
 #endif
     }
+
+    static std::size_t edit_distance(const std::string& str1,
+                                     const std::string& str2) {
+        std::size_t m = str1.size() + 1;
+        std::size_t n = str2.size() + 1;
+        std::vector<std::size_t> sub_dist(m * n);
+        for (std::size_t i = 0; i < m; ++i) {
+            for (std::size_t j = 0; j < n; ++j) {
+                sub_dist[i * n + j] =
+                    i == 0   ? j
+                    : j == 0 ? i
+                    : str1[i - 1] == str2[j - 1]
+                        ? sub_dist[(i - 1) * n + j - 1]
+                        : 1 + std::min({sub_dist[(i - 1) * n + j - 1],
+                                        sub_dist[(i - 1) * n + j],
+                                        sub_dist[i * n + j - 1]});
+            }
+        }
+        return sub_dist[m * n - 1];
+    }
+
 #undef TYPE_LIST
 };
 
