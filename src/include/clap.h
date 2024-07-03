@@ -101,17 +101,32 @@ struct CLAP {
                 std::exit(0);
             }
             if (option_or_arg[0] == '-') {
+                const auto& opts = get_options();
                 std::size_t offset{};
                 TYPE_CODE type_code{};
+                auto iter = opts.cbegin();
+                std::string raw_value;
+
                 bool invalid_option = false;
-                auto iter = get_options().cbegin();
+                bool has_value = false;
+
+                // parse option name
                 if (option_or_arg[1] == '-') {
-                    // it's an long option
-                    const auto& opts = get_options();
-                    iter = opts.find(option_or_arg);
+                    // long option
+                    std::size_t equal_sign_idx = 0;
+                    if ((equal_sign_idx = option_or_arg.find_first_of('=')) !=
+                        std::string::npos) {
+                        iter =
+                            opts.find(option_or_arg.substr(0, equal_sign_idx));
+                        raw_value = option_or_arg.substr(equal_sign_idx + 1,
+                                                         std::string::npos);
+                        has_value = true;
+                    } else {
+                        iter = opts.find(option_or_arg);
+                    }
                     invalid_option = iter == opts.end();
                 } else {
-                    // it's an short option
+                    // short option
                     auto& short_opts = get_short_name_map();
                     auto iter_short = short_opts.find(option_or_arg);
                     if (!(invalid_option = iter_short == short_opts.end())) {
@@ -128,16 +143,18 @@ struct CLAP {
                     type_code = iter->second.type_code;
                 }
 
-                std::string raw_value;
-                if (type_code == TYPE_CODE::bool_t) {
-                    raw_value = "1";
-                } else if (i + 1 == argc) {
-                    std::ostringstream oss;
-                    oss << argv[0] << ": missing value of option '"
-                        << option_or_arg << "'\n";
-                    throw std::invalid_argument(oss.str());
-                } else {
-                    raw_value = argv[++i];
+                // parse option value
+                if (!has_value) {
+                    if (type_code == TYPE_CODE::bool_t) {
+                        raw_value = "1";
+                    } else if (i + 1 == argc) {
+                        std::ostringstream oss;
+                        oss << argv[0] << ": missing value of option '"
+                            << option_or_arg << "'\n";
+                        throw std::invalid_argument(oss.str());
+                    } else {
+                        raw_value = argv[++i];
+                    }
                 }
                 assign_value(reinterpret_cast<char*>(&input) + offset,
                              type_code, raw_value);
