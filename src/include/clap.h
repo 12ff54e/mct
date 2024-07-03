@@ -114,7 +114,7 @@ struct CLAP {
                 if (option_or_arg[1] == '-') {
                     // long option
                     std::size_t equal_sign_idx = 0;
-                    if ((equal_sign_idx = option_or_arg.find_first_of('=')) !=
+                    if ((equal_sign_idx = option_or_arg.find('=')) !=
                         std::string::npos) {
                         iter =
                             opts.find(option_or_arg.substr(0, equal_sign_idx));
@@ -188,6 +188,34 @@ struct CLAP {
         auto print_space = [](std::size_t n) {
             for (std::size_t i = 0; i < n; ++i) { std::cout << ' '; }
         };
+        auto print_multline = [&print_space](const std::string& str,
+                                             std::size_t width,
+                                             std::size_t indent) {
+            std::size_t last_space_idx = 0;
+            std::size_t current_space_idx = 0;
+            std::size_t line_begin_idx = 0;
+            while (current_space_idx < std::string::npos) {
+                if (line_begin_idx > 0) { print_space(indent); }
+                last_space_idx = line_begin_idx;
+                while ((current_space_idx = str.find(' ', last_space_idx + 1)) <
+                       line_begin_idx + width) {
+                    last_space_idx = current_space_idx;
+                }
+                if (current_space_idx == std::string::npos) {
+                    if (str.size() - line_begin_idx > width) {
+                        // last word at new line
+                        current_space_idx = str.size();
+                    } else {
+                        last_space_idx = str.size();
+                    }
+                }
+                std::cout.write(str.data() + line_begin_idx,
+                                static_cast<std::streamsize>(last_space_idx -
+                                                             line_begin_idx))
+                    << '\n';
+                line_begin_idx = last_space_idx + 1;
+            }
+        };
 
         std::cout << "Usage: " << program_name << " " << get_usage() << '\n';
         std::cout << get_description() << "\n\n";
@@ -209,7 +237,7 @@ struct CLAP {
             } else {
                 print_space(30 - col);
             }
-            std::cout << it->second.description << '\n';
+            print_multline(it->second.description, 50, 32);
         }
     }
 
@@ -269,13 +297,13 @@ struct CLAP {
         get_short_name_map().emplace(OPTION_NAME_SHORT, result.first);         \
     }
 
-#define CLAP_REGISTER_OPT_DESC(NAME, DESC)                             \
-    {                                                                  \
-        auto result = get_options().emplace(                           \
-            "--" #NAME,                                                \
-            OptionConfig{offsetof(base, NAME),                         \
-                         get_type_code<decltype(NAME)>(), "", DESC});  \
-        if (!result.second) { report_repeat_definition(OPTION_NAME); } \
+#define CLAP_REGISTER_OPT_DESC(NAME, DESC)                            \
+    {                                                                 \
+        auto result = get_options().emplace(                          \
+            "--" #NAME,                                               \
+            OptionConfig{offsetof(base, NAME),                        \
+                         get_type_code<decltype(NAME)>(), "", DESC}); \
+        if (!result.second) { report_repeat_definition("--" #NAME); } \
     }
 
 #define CLAP_REGISTER_OPT_LONG_DESC(NAME, OPTION_NAME, DESC)           \
