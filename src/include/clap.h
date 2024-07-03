@@ -18,9 +18,11 @@
     PROCESS_TYPE(int)      \
     PROCESS_TYPE(unsigned) \
     PROCESS_TYPE(double)   \
+    PROCESS_TYPE(float)    \
     PROCESS_TYPE(string)
 
 enum class TYPE_CODE {
+    _help_t,
 #define PROCESS_TYPE(TYPE) TYPE##_t,
     TYPE_LIST()
 #undef PROCESS_TYPE
@@ -68,6 +70,25 @@ struct CLAP {
         return description;
     }
 
+    static std::string process_option(std::string opt, bool short_opt = false) {
+        bool valid_name = true;
+        if ((valid_name = !opt.empty()) && opt[0] == '-') {
+            if (short_opt) { return opt; }
+            if (opt.size() > 1 && opt[1] == '-') {
+                if (!short_opt) { return opt; }
+            }
+            valid_name = false;
+        }
+        if (!valid_name) {
+            std::ostringstream oss;
+            oss << "Invalid " << (short_opt ? "short" : "long")
+                << " option definition: '" << opt << "'\n";
+            throw std::invalid_argument(oss.str());
+        }
+
+        return (short_opt ? "-" : "--") + opt;
+    }
+
     template <typename Arg>
     static TYPE_CODE get_type_code() {
 #define PROCESS_TYPE(TYPE) \
@@ -86,21 +107,34 @@ struct CLAP {
         iss >> *reinterpret_cast<TYPE*>(adr); \
         break;                                \
     }
+
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch"
+#elif defined(__GNUC__) || defined(__GNUG__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch"
+#endif
         switch (type_code) { TYPE_LIST() }
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__) || defined(__GNUG__)
+#pragma GCC diagnostic pop
+#endif
+
 #undef PROCESS_TYPE
     }
 
     static void parse_input(T& input, int argc, char** argv) {
         std::size_t argument_idx = 0;
-        const std::string l_prefix = "--";
+        bool argument_mode = false;
         for (int i = 1; i < argc; ++i) {
             std::string option_or_arg{argv[i]};
-            if (option_or_arg.compare("--help") == 0 ||
-                option_or_arg.compare("-h") == 0) {
-                print_help(argv[0]);
-                std::exit(0);
+            if (option_or_arg.compare("--") == 0) {
+                argument_mode = true;
+                continue;
             }
-            if (option_or_arg[0] == '-') {
+            if (!argument_mode && option_or_arg[0] == '-') {
                 const auto& opts = get_options();
                 std::size_t offset{};
                 TYPE_CODE type_code{};
@@ -141,6 +175,12 @@ struct CLAP {
                 } else {
                     offset = iter->second.offset;
                     type_code = iter->second.type_code;
+                }
+
+                // is it help?
+                if (type_code == TYPE_CODE::_help_t) {
+                    print_help(argv[0]);
+                    std::exit(0);
                 }
 
                 // parse option value
@@ -260,7 +300,7 @@ struct CLAP {
 #define CLAP_END(NAME)                                                     \
     {                                                                      \
         auto result = get_options().emplace(                               \
-            "--help", OptionConfig{0, TYPE_CODE::int_t, "",                \
+            "--help", OptionConfig{0, TYPE_CODE::_help_t, "",              \
                                    "display this help message and exit"}); \
         if (get_short_name_map().emplace("-h", result.first).second) {     \
             result.first->second.short_name = "-h";                        \
@@ -269,7 +309,12 @@ struct CLAP {
     }                                                                      \
     }                                                                      \
     ;                                                                      \
-    _clap_##NAME##_::define_parameters();
+    try {                                                                  \
+        _clap_##NAME##_::define_parameters();                              \
+    } catch (std::exception & e) {                                         \
+        std::cerr << e.what();                                             \
+        return EINVAL;                                                     \
+    }
 
 #define CLAP_REGISTER_OPT_MINIMAL(NAME)                                 \
     {                                                                   \
@@ -281,20 +326,24 @@ struct CLAP {
 
 #define CLAP_REGISTER_OPT_LONG(NAME, OPTION_NAME)                        \
     {                                                                    \
+        auto option_name = process_option(OPTION_NAME);                  \
         auto result = get_options().emplace(                             \
-            OPTION_NAME, OptionConfig{offsetof(base, NAME),              \
+            option_name, OptionConfig{offsetof(base, NAME),              \
                                       get_type_code<decltype(NAME)>()}); \
-        if (!result.second) { report_repeat_definition(OPTION_NAME); }   \
+        if (!result.second) { report_repeat_definition(option_name); }   \
     }
 
-#define CLAP_REGISTER_OPT_LONG_SHORT(NAME, OPTION_NAME, OPTION_NAME_SHORT)     \
-    {                                                                          \
-        auto result = get_options().emplace(                                   \
-            OPTION_NAME,                                                       \
-            OptionConfig{offsetof(base, NAME),                                 \
-                         get_type_code<decltype(NAME)>(), OPTION_NAME_SHORT}); \
-        if (!result.second) { report_repeat_definition(OPTION_NAME); }         \
-        get_short_name_map().emplace(OPTION_NAME_SHORT, result.first);         \
+#define CLAP_REGISTER_OPT_LONG_SHORT(NAME, OPTION_NAME, OPTION_NAME_SHORT) \
+    {                                                                      \
+        auto option_name = process_option(OPTION_NAME);                    \
+        auto option_name_short = process_option(OPTION_NAME_SHORT, true);  \
+        auto result = get_options().emplace(                               \
+            option_name,                                                   \
+            OptionConfig{offsetof(base, NAME),                             \
+                         get_type_code<decltype(NAME)>(),                  \
+                         process_option(option_name_short, false)});       \
+        if (!result.second) { report_repeat_definition(option_name); }     \
+        get_short_name_map().emplace(option_name_short, result.first);     \
     }
 
 #define CLAP_REGISTER_OPT_DESC(NAME, DESC)                            \
@@ -308,21 +357,24 @@ struct CLAP {
 
 #define CLAP_REGISTER_OPT_LONG_DESC(NAME, OPTION_NAME, DESC)           \
     {                                                                  \
+        auto option_name = process_option(OPTION_NAME);                \
         auto result = get_options().emplace(                           \
-            OPTION_NAME,                                               \
+            option_name,                                               \
             OptionConfig{offsetof(base, NAME),                         \
                          get_type_code<decltype(NAME)>(), "", DESC});  \
-        if (!result.second) { report_repeat_definition(OPTION_NAME); } \
+        if (!result.second) { report_repeat_definition(option_name); } \
     }
 
 #define CLAP_REGISTER_OPT_FULL(NAME, OPTION_NAME, OPTION_NAME_SHORT, DESC) \
     {                                                                      \
+        auto option_name = process_option(OPTION_NAME);                    \
+        auto option_name_short = process_option(OPTION_NAME_SHORT, true);  \
         auto result = get_options().emplace(                               \
-            OPTION_NAME, OptionConfig{offsetof(base, NAME),                \
+            option_name, OptionConfig{offsetof(base, NAME),                \
                                       get_type_code<decltype(NAME)>(),     \
-                                      OPTION_NAME_SHORT, DESC});           \
-        if (!result.second) { report_repeat_definition(OPTION_NAME); }     \
-        get_short_name_map().emplace(OPTION_NAME_SHORT, result.first);     \
+                                      option_name_short, DESC});           \
+        if (!result.second) { report_repeat_definition(option_name); }     \
+        get_short_name_map().emplace(option_name_short, result.first);     \
     }
 
 // Macro overloading depending on argument number
