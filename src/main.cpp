@@ -20,6 +20,7 @@ struct Input {
     bool use_SI;
     unsigned radial_grid_count;
     unsigned poloidal_grid_count;
+    double psi_ratio;
     std::string input_path;
     std::string output_path;
 };
@@ -42,6 +43,9 @@ int main(int argc, char** argv) {
     CLAP_REGISTER_OPTION_WITH_DESCRIPTION(
         use_SI, "--use-si",
         "output with SI unit instead of normalized to B_0 and R_0")
+    CLAP_REGISTER_OPTION_WITH_DESCRIPTION(
+        psi_ratio, "--psi-ratio",
+        "ratio of psiw in output to that given in gfile, default to be 0.99")
     CLAP_END(Input)
 
     Input config;
@@ -78,8 +82,10 @@ int main(int argc, char** argv) {
 
     timer.pause_last_and_start_next("Generate BSpline");
 
+    constexpr std::size_t radial_sample_point = 256;
     Spdata spdata(g_file_data, config.radial_grid_count,
-                  config.poloidal_grid_count, config.use_SI);
+                  config.poloidal_grid_count, config.use_SI,
+                  radial_sample_point, config.psi_ratio);
 
     timer.pause_last_and_start_next("Write to spdata ");
 
