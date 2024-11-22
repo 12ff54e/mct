@@ -6,6 +6,7 @@
 #define ZQ_CLAP
 
 #include <algorithm>
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
@@ -109,19 +110,11 @@ struct CLAP {
         break;                                \
     }
 
-#if defined(__clang__)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wswitch"
-#elif defined(__GNUC__) || defined(__GNUG__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch"
-#endif
-        switch (type_code) { TYPE_LIST() }
-#if defined(__clang__)
-#pragma clang diagnostic pop
-#elif defined(__GNUC__) || defined(__GNUG__)
-#pragma GCC diagnostic pop
-#endif
+        switch (type_code) {
+            TYPE_LIST()
+            default:
+                assert(0 && "Unreachable");
+        }
 
 #undef PROCESS_TYPE
     }
