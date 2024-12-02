@@ -20,7 +20,7 @@ std::ifstream& operator>>(std::ifstream& is, GFileRawData& g) {
     std::getline(is, line);
     ss_line.str(line);
     ss_line.read(g.metadata.begin(), 48);
-    char str_tmp[4];
+    char str_tmp[5];
     ss_line.read(str_tmp, 4);
     ss_line.read(str_tmp, 4);
     g.nw = static_cast<unsigned>(atoi(str_tmp));
