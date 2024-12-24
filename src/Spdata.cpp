@@ -213,16 +213,6 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
         return std::sqrt(f * f + dp_dr * dp_dr + dp_dz * dp_dz) / pt.x();
     };
 
-    auto j_field = [&](Vec<2, double> pt, double) {
-        double dp_dr = flux_function.derivative(pt, {1, 0});
-        double dp_dz = flux_function.derivative(pt, {0, 1});
-        double r = pt.x();
-        pt -= g_file_data.magnetic_axis;
-        double r2 = pt.L2_norm_square_();
-
-        return r * r2 / (dp_dr * pt.x() + dp_dz * pt.y());
-    };
-
     auto bp2j_field = [&](Vec<2, double> pt, double) {
         double dp_dr = flux_function.derivative(pt, {1, 0});
         double dp_dz = flux_function.derivative(pt, {0, 1});
@@ -336,10 +326,10 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
                                                       poloidal_angles[i - 1],
                                                       poloidal_angles[i]));
         }
-        auto coef = b2j_int.back() / PI2;
+        const auto b2j_flux_avg = b2j_int.back() / PI2;
         tor_current_n.push_back(bp2j_int.back() / (PI2 * current_unit));
         // normalization
-        for (auto& v : b2j_int) { v /= coef; }
+        for (auto& v : b2j_int) { v /= b2j_flux_avg; }
         auto boozer_geo_intp =
             poloidal_template_full.interpolate(intp::util::get_range(b2j_int));
 
@@ -354,15 +344,14 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
             double z_grid = z_geo_intp(theta_geo);
 
             // be careful of normalization
-
-            magnetic_boozer(ri, i) =
-                b_field({r_grid, z_grid}, psi) / magnetic_field_unit;
+            const auto b = b_field({r_grid, z_grid}, psi);
+            magnetic_boozer(ri, i) = b / magnetic_field_unit;
             r_boozer(ri, i) = r_grid / length_unit;
             // z value is shifted such that magnetic axis has z = 0
             z_boozer(ri, i) =
                 (z_grid - g_file_data.magnetic_axis.y()) / length_unit;
-            jacobian_boozer(ri, i) = j_field({r_grid, z_grid}, psi) *
-                                     magnetic_field_unit / length_unit;
+            jacobian_boozer(ri, i) =
+                b2j_flux_avg / (b * b) * magnetic_field_unit / length_unit;
         }
 
         safety_factor.push_back(safety_factor_intp(psi));
