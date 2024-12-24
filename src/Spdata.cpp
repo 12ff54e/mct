@@ -127,8 +127,8 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
     double psi_ratio) {
     intp::InterpolationFunction<double, 2u> flux_function(
         ORDER_, g_file_data.flux,
-        std::make_pair(g_file_data.r_center - .5 * g_file_data.dim.x(),
-                       g_file_data.r_center + .5 * g_file_data.dim.x()),
+        std::make_pair(g_file_data.r_left,
+                       g_file_data.r_left + g_file_data.dim.x()),
         std::make_pair(g_file_data.z_mid - .5 * g_file_data.dim.y(),
                        g_file_data.z_mid + .5 * g_file_data.dim.y()));
 
