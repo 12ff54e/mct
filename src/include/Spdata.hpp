@@ -79,7 +79,7 @@ class Spdata {
 
     const bool use_si_;
     const std::size_t lsp_, lst_;
-    const double psi_delta_;
+    double psi_delta_;
     const double theta_delta_;
     const SpdataRaw_ spdata_raw_;
     const SpdataIntp_ spdata_intp_;
