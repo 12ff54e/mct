@@ -52,6 +52,7 @@ int main(int argc, char** argv) {
     config.use_SI = false;
     config.radial_grid_count = 129;
     config.poloidal_grid_count = 255;
+    config.psi_ratio = 0.99;
     try {
         CLAP<Input>::parse_input(config, argc, argv);
     } catch (std::exception& e) {
