@@ -127,14 +127,40 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
     double psi_ratio) {
     intp::InterpolationFunction<double, 2u> flux_function(
         ORDER_, g_file_data.flux,
-        std::make_pair(g_file_data.r_center - .5 * g_file_data.dim.x(),
-                       g_file_data.r_center + .5 * g_file_data.dim.x()),
+        std::make_pair(g_file_data.r_left,
+                       g_file_data.r_left + g_file_data.dim.x()),
         std::make_pair(g_file_data.z_mid - .5 * g_file_data.dim.y(),
                        g_file_data.z_mid + .5 * g_file_data.dim.y()));
 
-    const double psi_bd =
-        g_file_data.flux_LCFS - g_file_data.flux_magnetic_axis;
-    const double psi_wall = psi_ratio * psi_bd;
+    // check poloidal flux value at magnetic axis
+    const auto psi_ma_intp = flux_function(g_file_data.magnetic_axis);
+    if (std::abs((psi_ma_intp - g_file_data.flux_magnetic_axis) /
+                 (g_file_data.flux_LCFS - g_file_data.flux_magnetic_axis)) >
+        1.e-4) {
+        std::cout << "The poloidal flux of magnetic axis given in gfile "
+                     "deviates from interpolated value.\n"
+                  << "  \\psi_p in gfile: " << g_file_data.flux_magnetic_axis
+                  << "\n  \\psi_p from interpolation: " << psi_ma_intp << '\n';
+    }
+
+    double psi_boundary_min = 10. * std::pow(g_file_data.r_center, 2) *
+                              std::abs(g_file_data.b_center);
+    for (const auto& pt : g_file_data.boundary) {
+        psi_boundary_min = std::min(psi_boundary_min, flux_function(pt));
+    }
+    std::cout << "The poloidal flux of last closed flux surface is "
+              << g_file_data.flux_LCFS << '\n'
+              << "Minimum of interpolated value at boundary points is "
+              << psi_boundary_min << '\n';
+
+    const double psi_bd = g_file_data.flux_LCFS - psi_ma_intp;
+    double psi_wall = psi_ratio * psi_bd;
+    if (psi_wall > psi_boundary_min - psi_ma_intp) {
+        psi_wall = psi_boundary_min - psi_ma_intp;
+        std::cout << "Interpolated flux value at boundary is too small, so "
+                     "psi_wall is set to this value.\n";
+    }
+    psi_delta_ = psi_wall / static_cast<double>(lsp_ - 1);
 
     // contours are from \\Delta\\psi to LCFS
     std::vector<Contour> contours;
@@ -144,7 +170,7 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
             util::lerp(psi_delta_, psi_wall,
                        static_cast<double>(i) /
                            static_cast<double>(radial_sample - 1)) +
-                g_file_data.flux_magnetic_axis,
+                psi_ma_intp,
             flux_function, g_file_data);
     }
 
@@ -185,16 +211,6 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
         double f = poloidal_current_intp(psi);
 
         return std::sqrt(f * f + dp_dr * dp_dr + dp_dz * dp_dz) / pt.x();
-    };
-
-    auto j_field = [&](Vec<2, double> pt, double) {
-        double dp_dr = flux_function.derivative(pt, {1, 0});
-        double dp_dz = flux_function.derivative(pt, {0, 1});
-        double r = pt.x();
-        pt -= g_file_data.magnetic_axis;
-        double r2 = pt.L2_norm_square_();
-
-        return r * r2 / (dp_dr * pt.x() + dp_dz * pt.y());
     };
 
     auto bp2j_field = [&](Vec<2, double> pt, double) {
@@ -266,7 +282,7 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
     X(bp2j)
 
     for (std::size_t ri = 0; ri < contours.size(); ++ri) {
-        const double psi = contours[ri].flux() - g_file_data.flux_magnetic_axis;
+        const double psi = contours[ri].flux() - psi_ma_intp;
         const std::size_t poloidal_size = contours[ri].size() + 1;
 #define X(name)                     \
     std::vector<double> name##_geo; \
@@ -310,10 +326,10 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
                                                       poloidal_angles[i - 1],
                                                       poloidal_angles[i]));
         }
-        auto coef = b2j_int.back() / PI2;
+        const auto b2j_flux_avg = b2j_int.back() / PI2;
         tor_current_n.push_back(bp2j_int.back() / (PI2 * current_unit));
         // normalization
-        for (auto& v : b2j_int) { v /= coef; }
+        for (auto& v : b2j_int) { v /= b2j_flux_avg; }
         auto boozer_geo_intp =
             poloidal_template_full.interpolate(intp::util::get_range(b2j_int));
 
@@ -328,15 +344,14 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
             double z_grid = z_geo_intp(theta_geo);
 
             // be careful of normalization
-
-            magnetic_boozer(ri, i) =
-                b_field({r_grid, z_grid}, psi) / magnetic_field_unit;
+            const auto b = b_field({r_grid, z_grid}, psi);
+            magnetic_boozer(ri, i) = b / magnetic_field_unit;
             r_boozer(ri, i) = r_grid / length_unit;
             // z value is shifted such that magnetic axis has z = 0
             z_boozer(ri, i) =
                 (z_grid - g_file_data.magnetic_axis.y()) / length_unit;
-            jacobian_boozer(ri, i) = j_field({r_grid, z_grid}, psi) *
-                                     magnetic_field_unit / length_unit;
+            jacobian_boozer(ri, i) =
+                b2j_flux_avg / (b * b) * magnetic_field_unit / length_unit;
         }
 
         safety_factor.push_back(safety_factor_intp(psi));
@@ -344,11 +359,9 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
         pressure_n.push_back(pressure_intp(psi) / pressure_unit);
         tor_flux_n.push_back(
             (ri == 0 ? 0. : tor_flux_n.back()) +
-            util::integrate_coarse(safety_factor_intp,
-                                   ri == 0 ? 0.
-                                           : (contours[ri - 1].flux() -
-                                              g_file_data.flux_magnetic_axis),
-                                   psi) /
+            util::integrate_coarse(
+                safety_factor_intp,
+                ri == 0 ? 0. : (contours[ri - 1].flux() - psi_ma_intp), psi) /
                 flux_unit);
         // r_minor defined as distance from magnetic axis at weak field side
         // this value is always normalized to R0
