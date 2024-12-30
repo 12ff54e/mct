@@ -1,5 +1,5 @@
-#include "include/Contour.hpp"
-#include "include/util.hpp"
+#include "Contour.h"
+#include "util.h"
 
 /**
  * @brief Calculate contour points by finding coordinate between magnetic axis

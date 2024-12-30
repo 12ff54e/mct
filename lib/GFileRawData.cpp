@@ -3,8 +3,8 @@
 #include <iostream>
 #include <sstream>
 
-#include "include/GFileRawData.hpp"
-#include "include/util.hpp"
+#include "GFileRawData.h"
+#include "util.h"
 
 bool GFileRawData::is_complete() const noexcept {
     return complete_;

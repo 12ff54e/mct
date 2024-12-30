@@ -4,9 +4,9 @@
 #include <algorithm>
 #include <vector>
 
-#include "GFileRawData.hpp"
-#include "Vec.hpp"
-#include "util.hpp"
+#include "GFileRawData.h"
+#include "Vec.h"
+#include "util.h"
 
 class Contour {
    public:

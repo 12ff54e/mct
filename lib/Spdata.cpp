@@ -1,8 +1,8 @@
 #include <iomanip>
 #include <limits>
 
-#include "include/Contour.hpp"
-#include "include/Spdata.hpp"
+#include "Contour.h"
+#include "Spdata.h"
 
 Spdata::Spdata(const GFileRawData& g_file_data,
                std::size_t radial_grid_num,

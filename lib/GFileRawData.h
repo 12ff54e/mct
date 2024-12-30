@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "BSplineInterpolation/src/include/Interpolation.hpp"
-#include "Vec.hpp"
+#include "Vec.h"
 
 struct GFileRawData {
     std::array<char, 48> metadata;

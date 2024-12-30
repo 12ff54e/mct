@@ -4,7 +4,7 @@
 #include <ostream>
 
 #include "BSplineInterpolation/src/include/Interpolation.hpp"
-#include "GFileRawData.hpp"
+#include "GFileRawData.h"
 
 class Spdata {
     static constexpr std::size_t FIELD_NUM_2D = 4;

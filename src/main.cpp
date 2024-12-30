@@ -3,14 +3,14 @@
 #include <fstream>
 #include <iomanip>
 
-#include "include/Contour.hpp"
-#include "include/GFileRawData.hpp"
-#include "include/Spdata.hpp"
+#include "lib/Contour.h"
+#include "lib/GFileRawData.h"
+#include "lib/Spdata.h"
 
 #define ZQ_TIMER_IMPLEMENTATION
-#include "include/Timer.h"
+#include "lib/Timer.h"
 
-#include "include/clap.h"
+#include "lib/clap.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
