@@ -20,13 +20,14 @@ endif()
 include_directories(./deps)
 add_compile_definitions($<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:_DEBUG>)
 
-add_executable(mct src/main.cpp src/Spdata.cpp)
-target_include_directories(mct PRIVATE ${PROJECT_SOURCE_DIR})
+add_executable(mct_exe src/main.cpp src/Spdata.cpp)
+set_property(TARGET mct_exe PROPERTY OUTPUT_NAME mct)
+target_include_directories(mct_exe PRIVATE ${PROJECT_SOURCE_DIR})
 
 list(APPEND lib_src_files Contour.cpp GFileRawData.cpp MagneticEquilibrium.cpp)
 list(TRANSFORM lib_src_files PREPEND lib/)
-add_library(libmct ${lib_src_files})
-target_link_libraries(mct PUBLIC libmct)
+add_library(mct ${lib_src_files})
+target_link_libraries(mct_exe PUBLIC mct)
 
 list(APPEND tests vec-test util-test)
 list(LENGTH tests test_num)
