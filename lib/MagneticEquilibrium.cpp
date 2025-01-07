@@ -2,126 +2,10 @@
 #include <limits>
 
 #include "Contour.h"
-#include "Spdata.h"
+#include "MagneticEquilibrium.h"
 
-Spdata::Spdata(const GFileRawData& g_file_data,
-               std::size_t radial_grid_num,
-               std::size_t poloidal_grid_num,
-               bool use_si,
-               std::size_t radial_sample,
-               double psi_ratio)
-    : use_si_(use_si),
-      lsp_(radial_grid_num),
-      lst_(poloidal_grid_num),
-      psi_delta_(psi_ratio *
-                 (g_file_data.flux_LCFS - g_file_data.flux_magnetic_axis) /
-                 static_cast<double>(lsp_ - 1)),
-      theta_delta_(2. * M_PI / static_cast<double>(lst_)),
-      spdata_raw_{
-          generate_boozer_coordinate_(g_file_data, radial_sample, psi_ratio)},
-      spdata_intp_{spdata_raw_, *this, std::make_index_sequence<FIELD_NUM_2D>{},
-                   std::make_index_sequence<FIELD_NUM_1D>{}} {}
-
-std::ostream& operator<<(std::ostream& os, const Spdata& spdata) {
-    // mesh grid info
-    os << std::setw(4) << spdata.lsp_ << std::setw(4) << spdata.lst_
-       << std::setw(4) << 4 << std::setw(4) << 8 << '\n';
-    os << std::scientific << std::uppercase << std::setprecision(10);
-    os << std::setw(18) << spdata.spdata_intp_.psi_sample_for_output.back()
-       << std::setw(18) << spdata.spdata_intp_.psi_sample_for_output.back()
-       << '\n';
-
-    const auto psi_delta = spdata.psi_delta_ / spdata.spdata_raw_.flux_unit;
-    const auto theta_delta = spdata.theta_delta_;
-    const auto lst = spdata.lst_;
-
-    auto write_1d_coef = [&](const auto& f_1d, std::size_t idx,
-                             double value_on_axis, bool singular) {
-        double c0, c1, c2;
-        if (idx == 0) {
-            const double v1 = f_1d(psi_delta) - value_on_axis;
-            const double v2 = f_1d.derivative(std::make_pair(psi_delta, 1)) *
-                              (singular ? 2. * std::sqrt(psi_delta) : 1.);
-            const double d = singular ? std::sqrt(psi_delta) : psi_delta;
-            c0 = value_on_axis;
-            c1 = 2. * v1 / d - v2;
-            c2 = (-v1 + v2 * d) / (d * d);
-        } else {
-            const double psi = static_cast<double>(idx) * psi_delta;
-            c0 = f_1d(psi);
-            c1 = f_1d.derivative(std::make_pair(psi, 1));
-            c2 = .5 * f_1d.derivative(std::make_pair(psi + .5 * psi_delta, 2));
-        }
-        os << std::setw(18) << c0 << std::setw(18) << c1 << std::setw(18) << c2
-           << '\n';
-    };
-
-    auto write_2d_coef = [&](auto& f_2d, std::size_t idx,
-                             double value_on_axis) {
-        for (size_t i = 0; i < 9; ++i) {
-            size_t psi_order = i % 3;
-            size_t theta_order = i / 3;
-            for (size_t j = 0; j <= lst; ++j) {
-                double coef =
-                    (psi_order == 2 ? .5 : 1.) * (theta_order == 2 ? .5 : 1.);
-                const double theta =
-                    (static_cast<double>(j) + (theta_order == 2 ? .5 : 0.)) *
-                    theta_delta;
-                if (idx == 0) {
-                    const double v1 =
-                        theta_order == 0
-                            ? f_2d(psi_delta, theta) - value_on_axis
-                            : f_2d.derivative({psi_delta, theta},
-                                              {0, theta_order});
-                    const double v2 =
-                        f_2d.derivative({psi_delta, theta}, {1, theta_order});
-
-                    coef = psi_order == 0
-                               ? theta_order == 0 ? value_on_axis : 0.
-                               : 2. * coef *
-                                     (psi_order == 1
-                                          ? (v1 - v2 * psi_delta) /
-                                                std::sqrt(psi_delta)
-                                          : -(v1 - 2. * v2 * psi_delta) /
-                                                psi_delta);
-                } else {
-                    const double psi = (static_cast<double>(idx) +
-                                        (psi_order == 2 ? .5 : 0.)) *
-                                       psi_delta;
-                    coef = (i == 0 ? f_2d(psi, theta)
-                                   : coef * f_2d.derivative(
-                                                {psi, theta},
-                                                {psi_order, theta_order}));
-                }
-
-                os << std::setw(18) << coef;
-                if (j % 4 == 3) { os << '\n'; }
-            }
-            if ((lst + 1) % 4 != 0) { os << '\n'; }
-        }
-    };
-
-    for (std::size_t idx = 0; idx < spdata.lsp_; ++idx) {
-        for (std::size_t i_2d = 0; i_2d < Spdata::FIELD_NUM_2D; ++i_2d) {
-            write_2d_coef(spdata.spdata_intp_.intp_2d[i_2d], idx,
-                          spdata.spdata_raw_.axis_value_2d[i_2d]);
-        }
-        for (std::size_t i_1d = 0; i_1d < Spdata::FIELD_NUM_1D; ++i_1d) {
-            write_1d_coef(spdata.spdata_intp_.intp_1d[i_1d], idx,
-                          spdata.spdata_raw_.axis_value_1d[i_1d], i_1d == 4);
-        }
-    }
-
-    // TODO: ripple related
-    os << std::setw(4) << 0 << std::setw(4) << 0 << '\n';
-    os << std::setw(18) << spdata.spdata_raw_.axis_value_2d[1] << std::setw(18)
-       << 0. << std::setw(18) << 0. << '\n';
-    os << std::setw(18) << 0. << std::setw(18) << 0. << '\n';
-
-    return os;
-}
-
-Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
+MagneticEquilibrium::MagneticEquilibriumRaw_
+MagneticEquilibrium::generate_boozer_coordinate_(
     const GFileRawData& g_file_data,
     std::size_t radial_sample,
     double psi_ratio) {
@@ -160,7 +44,7 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
         std::cout << "Interpolated flux value at boundary is too small, so "
                      "psi_wall is set to this value.\n";
     }
-    psi_delta_ = psi_wall / static_cast<double>(lsp_ - 1);
+    psi_delta_ = psi_wall / static_cast<double>(lsp - 1);
 
     // contours are from \\Delta\\psi to LCFS
     std::vector<Contour> contours;
@@ -245,10 +129,10 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
 
     // output data
 
-    intp::Mesh<double, 2> magnetic_boozer(radial_sample, lst_ + 1);
-    intp::Mesh<double, 2> r_boozer(radial_sample, lst_ + 1);
-    intp::Mesh<double, 2> z_boozer(radial_sample, lst_ + 1);
-    intp::Mesh<double, 2> jacobian_boozer(radial_sample, lst_ + 1);
+    intp::Mesh<double, 2> magnetic_boozer(radial_sample, lst + 1);
+    intp::Mesh<double, 2> r_boozer(radial_sample, lst + 1);
+    intp::Mesh<double, 2> z_boozer(radial_sample, lst + 1);
+    intp::Mesh<double, 2> jacobian_boozer(radial_sample, lst + 1);
 
     std::vector<double> safety_factor, pol_current_n, tor_current_n, pressure_n,
         r_minor_n, tor_flux_n;
@@ -334,9 +218,9 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
             poloidal_template_full.interpolate(intp::util::get_range(b2j_int));
 
         // calculate necessary values on a even-spaced boozer grid
-        for (size_t i = 0; i <= lst_; ++i) {
+        for (size_t i = 0; i <= lst; ++i) {
             double theta_boozer =
-                (static_cast<double>(i % lst_) + .5) * theta_delta_;
+                (static_cast<double>(i % lst) + .5) * theta_delta_;
             double theta_geo = util::find_root(
                 [&](double t) { return boozer_geo_intp(t) - theta_boozer; }, 0.,
                 PI2);
@@ -367,44 +251,65 @@ Spdata::SpdataRaw_ Spdata::generate_boozer_coordinate_(
         // this value is always normalized to R0
         r_minor_n.push_back(r_geo_intp(0.) / R0 - 1.);
     }
+
+    // psi_delta_ is normalized after flux surface is fully constructed, and
+    // should never be changed hereafter
+    psi_delta_ /= flux_unit;
+
     const double q0 = safety_factor_intp(0);
     const double b0n = B0 / magnetic_field_unit;
     const double g0n = poloidal_current_intp(0) / current_unit;
     const double p0n = pressure_intp(0) / pressure_unit;
-    return SpdataRaw_{{std::move(magnetic_boozer), std::move(r_boozer),
-                       std::move(z_boozer), std::move(jacobian_boozer)},
-                      {std::move(safety_factor), std::move(pol_current_n),
-                       std::move(tor_current_n), std::move(pressure_n),
-                       std::move(r_minor_n), std::move(tor_flux_n)},
-                      {b0n, R0 / length_unit, 0., q0 * g0n / (b0n * b0n)},
-                      {q0, g0n, 0., p0n, 0., 0.},
-                      flux_unit};
+    return MagneticEquilibriumRaw_{
+        {std::move(magnetic_boozer), std::move(r_boozer), std::move(z_boozer),
+         std::move(jacobian_boozer)},
+        {std::move(safety_factor), std::move(pol_current_n),
+         std::move(tor_current_n), std::move(pressure_n), std::move(r_minor_n),
+         std::move(tor_flux_n)},
+        {b0n, R0 / length_unit, 0., q0 * g0n / (b0n * b0n)},
+        {q0, g0n, 0., p0n, 0., 0.},
+        flux_unit};
 }
 
-std::vector<double> Spdata::generate_psi_sample_for_output_(double unit) const {
-    std::vector<double> psi(lsp_);
-    psi[0] = psi_delta_ / unit;
-    for (std::size_t i = 1; i < lsp_ - 1; ++i) {
-        psi[i] = psi_delta_ * (static_cast<double>(i) + .5) / unit;
-    }
-    psi[lsp_ - 1] = static_cast<double>(lsp_ - 1) * psi_delta_ / unit;
-
-    return psi;
+double MagneticEquilibrium::psi_delta() const {
+    return psi_delta_;
+}
+double MagneticEquilibrium::theta_delta() const {
+    return theta_delta_;
 }
 
-intp::InterpolationFunction<double, 2> Spdata::create_2d_spline_(
+const std::array<double, MagneticEquilibrium::FIELD_NUM_2D>&
+MagneticEquilibrium::axis_value_2d() const {
+    return spdata_raw_.axis_value_2d;
+}
+const std::array<double, MagneticEquilibrium::FIELD_NUM_1D>&
+MagneticEquilibrium::axis_value_1d() const {
+    return spdata_raw_.axis_value_1d;
+}
+const std::vector<double>& MagneticEquilibrium::psi_for_output() const {
+    return intp_data().psi_sample_for_output;
+}
+
+const MagneticEquilibrium::MagneticEquilibriumIntp_&
+MagneticEquilibrium::intp_data() const {
+    return spdata_intp_;
+}
+
+intp::InterpolationFunction<double, 2> MagneticEquilibrium::create_2d_spline_(
     const intp::Mesh<double, 2>& data,
     const std::vector<double>& psi_sample) const {
     // interpolate the even-spaced data
     intp::InterpolationFunction<double, 2> data_intp(
         ORDER_, {false, true}, data,
-        std::make_pair(psi_sample.front(), psi_sample.back()),
+        std::make_pair(psi_delta(), psi_delta() * static_cast<double>(lsp - 1)),
         std::make_pair(.5 * theta_delta_, 2. * M_PI + .5 * theta_delta_));
 
+    if (psi_sample.empty()) { return data_intp; }
+
     // resample on the interpolated function
-    intp::Mesh<double, 2> data_resampled(lsp_, lst_ + 1);
-    for (std::size_t i = 0; i < lsp_; ++i) {
-        for (std::size_t j = 0; j <= lst_; ++j) {
+    intp::Mesh<double, 2> data_resampled(lsp, lst + 1);
+    for (std::size_t i = 0; i < lsp; ++i) {
+        for (std::size_t j = 0; j <= lst; ++j) {
             data_resampled(i, j) = data_intp(
                 psi_sample[i], (static_cast<double>(j) + .5) * theta_delta_);
         }
@@ -418,13 +323,15 @@ intp::InterpolationFunction<double, 2> Spdata::create_2d_spline_(
         std::make_pair(.5 * theta_delta_, 2. * M_PI + .5 * theta_delta_)};
 }
 
-intp::InterpolationFunction1D<double> Spdata::create_1d_spline_(
+intp::InterpolationFunction1D<double> MagneticEquilibrium::create_1d_spline_(
     const std::vector<double>& data,
     const std::vector<double>& psi_sample) const {
     // interpolate the even-spaced data
     intp::InterpolationFunction1D<double> data_intp(
-        std::make_pair(psi_sample.front(), psi_sample.back()),
+        std::make_pair(psi_delta(), psi_delta() * static_cast<double>(lsp - 1)),
         intp::util::get_range(data), ORDER_, false);
+
+    if (psi_sample.empty()) { return data_intp; }
 
     // resample on the interpolated function
     std::vector<double> data_resampled;
