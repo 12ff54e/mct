@@ -1,8 +1,6 @@
 #ifndef MCT_MAGNETIC_EQUILIBRIUM_
 #define MCT_MAGNETIC_EQUILIBRIUM_
 
-#include <ostream>
-
 #include "BSplineInterpolation/src/include/Interpolation.hpp"
 #include "GFileRawData.h"
 
