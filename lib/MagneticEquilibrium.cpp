@@ -9,8 +9,8 @@ MagneticEquilibrium::generate_boozer_coordinate_(
     const GFileRawData& g_file_data,
     std::size_t radial_sample,
     double psi_ratio) {
-    intp::InterpolationFunction<double, 2u> flux_function(
-        ORDER_, g_file_data.flux,
+    intp::InterpolationFunction<double, 2u, ORDER> flux_function(
+        g_file_data.flux,
         std::make_pair(g_file_data.r_left,
                        g_file_data.r_left + g_file_data.dim.x()),
         std::make_pair(g_file_data.z_mid - .5 * g_file_data.dim.y(),
@@ -61,19 +61,18 @@ MagneticEquilibrium::generate_boozer_coordinate_(
     constexpr double magnetic_constant = 4.e-7 * M_PI;
 
     // safety factor, on shifted psi
-    intp::InterpolationFunction1D<> safety_factor_intp{
+    intp::InterpolationFunction1D<ORDER> safety_factor_intp{
         std::make_pair(0., psi_bd),
-        intp::util::get_range(g_file_data.safety_factor), ORDER_};
+        intp::util::get_range(g_file_data.safety_factor)};
 
     // poloidal current, on shifted psi
-    intp::InterpolationFunction1D<> poloidal_current_intp{
-        std::make_pair(0., psi_bd), intp::util::get_range(g_file_data.f_pol),
-        ORDER_};
+    intp::InterpolationFunction1D<ORDER> poloidal_current_intp{
+        std::make_pair(0., psi_bd), intp::util::get_range(g_file_data.f_pol)};
 
     // pressure, on shifted psi
-    intp::InterpolationFunction1D<> pressure_intp{
-        std::make_pair(0., psi_bd), intp::util::get_range(g_file_data.pressure),
-        ORDER_};
+    intp::InterpolationFunction1D<ORDER> pressure_intp{
+        std::make_pair(0., psi_bd),
+        intp::util::get_range(g_file_data.pressure)};
 
     // this following function accepts shifted psi (0 at m.a.)
 
@@ -113,9 +112,8 @@ MagneticEquilibrium::generate_boozer_coordinate_(
     std::vector<double> poloidal_angles{g_file_data.geometric_poloidal_angles};
     poloidal_angles.push_back(poloidal_angles.front() + PI2);
     // \\theta range: \\theta_0, ..., \\theta_0 + 2\\pi
-    intp::InterpolationFunctionTemplate1D<> poloidal_template{
-        intp::util::get_range(poloidal_angles), poloidal_angles.size(), 5,
-        true};
+    intp::InterpolationFunctionTemplate1D<ORDER> poloidal_template{
+        intp::util::get_range(poloidal_angles), poloidal_angles.size(), true};
 
     if (std::fpclassify(poloidal_angles.front()) != FP_ZERO) {
         poloidal_angles.insert(poloidal_angles.begin(), 0);
@@ -123,9 +121,8 @@ MagneticEquilibrium::generate_boozer_coordinate_(
 
     poloidal_angles.back() = PI2;
     // \\theta range: 0, ..., 2\\pi
-    intp::InterpolationFunctionTemplate1D<> poloidal_template_full{
-        intp::util::get_range(poloidal_angles), poloidal_angles.size(), 5,
-        false};
+    intp::InterpolationFunctionTemplate1D<ORDER> poloidal_template_full{
+        intp::util::get_range(poloidal_angles), poloidal_angles.size(), false};
 
     // output data
 
@@ -295,12 +292,13 @@ MagneticEquilibrium::intp_data() const {
     return spdata_intp_;
 }
 
-intp::InterpolationFunction<double, 2> MagneticEquilibrium::create_2d_spline_(
+intp::InterpolationFunction<double, 2, MagneticEquilibrium::ORDER_OUT>
+MagneticEquilibrium::create_2d_spline_(
     const intp::Mesh<double, 2>& data,
     const std::vector<double>& psi_sample) const {
     // interpolate the even-spaced data
-    intp::InterpolationFunction<double, 2> data_intp(
-        ORDER_, {false, true}, data,
+    intp::InterpolationFunction<double, 2, ORDER_OUT> data_intp(
+        {false, true}, data,
         std::make_pair(psi_delta(), psi_delta() * static_cast<double>(lsp - 1)),
         std::make_pair(.5 * theta_delta_, 2. * M_PI + .5 * theta_delta_));
 
@@ -315,21 +313,21 @@ intp::InterpolationFunction<double, 2> MagneticEquilibrium::create_2d_spline_(
         }
     }
     // construct the interpolation function for output
-    return intp::InterpolationFunction<double, 2>{
-        ORDER_OUT_,
+    return intp::InterpolationFunction<double, 2, ORDER_OUT>{
         {false, true},
         std::move(data_resampled),
         intp::util::get_range(psi_sample),
         std::make_pair(.5 * theta_delta_, 2. * M_PI + .5 * theta_delta_)};
 }
 
-intp::InterpolationFunction1D<double> MagneticEquilibrium::create_1d_spline_(
+intp::InterpolationFunction1D<MagneticEquilibrium::ORDER_OUT, double>
+MagneticEquilibrium::create_1d_spline_(
     const std::vector<double>& data,
     const std::vector<double>& psi_sample) const {
     // interpolate the even-spaced data
-    intp::InterpolationFunction1D<double> data_intp(
+    intp::InterpolationFunction1D<ORDER_OUT, double> data_intp(
         std::make_pair(psi_delta(), psi_delta() * static_cast<double>(lsp - 1)),
-        intp::util::get_range(data), ORDER_, false);
+        intp::util::get_range(data), false);
 
     if (psi_sample.empty()) { return data_intp; }
 
@@ -340,7 +338,7 @@ intp::InterpolationFunction1D<double> MagneticEquilibrium::create_1d_spline_(
         data_resampled.push_back(data_intp(psi));
     }
 
-    return intp::InterpolationFunction1D<double>{
+    return intp::InterpolationFunction1D<ORDER_OUT, double>{
         intp::util::get_range(psi_sample),
-        intp::util::get_range(data_resampled), ORDER_OUT_};
+        intp::util::get_range(data_resampled)};
 }

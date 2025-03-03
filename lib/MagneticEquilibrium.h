@@ -5,6 +5,11 @@
 #include "GFileRawData.h"
 
 class MagneticEquilibrium {
+   public:
+    // interpolation order of internal use
+    constexpr static std::size_t ORDER = 5;
+    constexpr static std::size_t ORDER_OUT = 2;
+
    protected:
     static constexpr std::size_t FIELD_NUM_2D = 4;
     static constexpr std::size_t FIELD_NUM_1D = 6;
@@ -38,7 +43,8 @@ class MagneticEquilibrium {
         // - r
         // - z
         // - jacobian
-        std::array<intp::InterpolationFunction<double, 2>, FIELD_NUM_2D>
+        std::array<intp::InterpolationFunction<double, 2, ORDER_OUT>,
+                   FIELD_NUM_2D>
             intp_2d;
         // - safety_factor
         // - poloidal_current
@@ -46,7 +52,9 @@ class MagneticEquilibrium {
         // - pressure
         // - minor_radius
         // - toroidal_flux
-        std::array<intp::InterpolationFunction1D<double>, FIELD_NUM_1D> intp_1d;
+        std::array<intp::InterpolationFunction1D<ORDER_OUT, double>,
+                   FIELD_NUM_1D>
+            intp_1d;
 
         template <typename F,
                   std::size_t... indices_2d,
@@ -97,10 +105,6 @@ class MagneticEquilibrium {
     const std::array<double, FIELD_NUM_1D>& axis_value_1d() const;
 
    private:
-    // interpolation order of internal use
-    constexpr static std::size_t ORDER_ = 5;
-    constexpr static std::size_t ORDER_OUT_ = 2;
-
     const bool use_si_;
     double psi_delta_;
     const double theta_delta_;
@@ -110,10 +114,10 @@ class MagneticEquilibrium {
     MagneticEquilibriumRaw_ generate_boozer_coordinate_(const GFileRawData&,
                                                         std::size_t,
                                                         double);
-    intp::InterpolationFunction<double, 2> create_2d_spline_(
+    intp::InterpolationFunction<double, 2, ORDER_OUT> create_2d_spline_(
         const intp::Mesh<double, 2>&,
         const std::vector<double>&) const;
-    intp::InterpolationFunction1D<double> create_1d_spline_(
+    intp::InterpolationFunction1D<ORDER_OUT, double> create_1d_spline_(
         const std::vector<double>&,
         const std::vector<double>&) const;
 };
