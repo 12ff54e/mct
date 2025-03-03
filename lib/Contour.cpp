@@ -1,5 +1,5 @@
-#include "include/Contour.hpp"
-#include "include/util.hpp"
+#include "Contour.h"
+#include "util.h"
 
 /**
  * @brief Calculate contour points by finding coordinate between magnetic axis
@@ -7,9 +7,11 @@
  * same as boundary contour points along flux surface.
  *
  */
-Contour::Contour(double psi,
-                 const intp::InterpolationFunction<double, 2>& flux,
-                 const GFileRawData& g_file)
+Contour::Contour(
+    double psi,
+    const intp::InterpolationFunction<double, 2, MagneticEquilibrium::ORDER>&
+        flux,
+    const GFileRawData& g_file)
     : flux_(psi), g_file_(g_file) {
     pts_.reserve(g_file.boundary.size());
     for (size_t i = 0; i < g_file.boundary.size(); ++i) {

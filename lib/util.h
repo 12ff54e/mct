@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "Vec.hpp"
+#include "Vec.h"
 
 namespace util {
 

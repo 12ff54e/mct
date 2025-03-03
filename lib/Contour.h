@@ -4,9 +4,10 @@
 #include <algorithm>
 #include <vector>
 
-#include "GFileRawData.hpp"
-#include "Vec.hpp"
-#include "util.hpp"
+#include "GFileRawData.h"
+#include "MagneticEquilibrium.h"
+#include "Vec.h"
+#include "util.h"
 
 class Contour {
    public:
@@ -19,7 +20,8 @@ class Contour {
 
    public:
     Contour(double,
-            const intp::InterpolationFunction<double, 2>&,
+            const intp::
+                InterpolationFunction<double, 2, MagneticEquilibrium::ORDER>&,
             const GFileRawData&);
 
     // properties
@@ -38,7 +40,7 @@ class Contour {
     double definite_integrate_along(Field, Measure);
 
     template <typename Field>
-    intp::InterpolationFunction1D<double> indefinite_integrate_along(
+    intp::InterpolationFunction1D<3, double> indefinite_integrate_along(
         Field,
         bool = true);
 };
@@ -66,15 +68,15 @@ double Contour::definite_integrate_along(Field f, Measure s) {
     abscissa.emplace_back(abscissa.front() + 2 * M_PI);
     ordinate.emplace_back(ordinate.front());
 
-    intp::InterpolationFunction<double, 1> f_interp(
-        3, true, std::make_pair(abscissa.begin(), abscissa.end()),
+    intp::InterpolationFunction<double, 1, 3> f_interp(
+        true, std::make_pair(abscissa.begin(), abscissa.end()),
         std::make_pair(ordinate.begin(), ordinate.end()));
 
     return util::integrate(f_interp, 0., 2 * M_PI);
 }
 
 template <typename Field>
-intp::InterpolationFunction1D<double> Contour::indefinite_integrate_along(
+intp::InterpolationFunction1D<3, double> Contour::indefinite_integrate_along(
     Field f,
     bool normalization) {
     std::vector<double> ordinate;
@@ -97,9 +99,9 @@ intp::InterpolationFunction1D<double> Contour::indefinite_integrate_along(
                     g_file_.geometric_poloidal_angles.end());
     abscissa.push_back(g_file_.geometric_poloidal_angles.front() + 2 * M_PI);
 
-    intp::InterpolationFunction1D<double> f_interp(
+    intp::InterpolationFunction1D<3, double> f_interp(
         std::make_pair(std::next(abscissa.begin()), abscissa.end()),
-        std::make_pair(ordinate.begin(), ordinate.end()), 3, true);
+        std::make_pair(ordinate.begin(), ordinate.end()), true);
 
     // do the integration segment by segment
 
@@ -120,9 +122,9 @@ intp::InterpolationFunction1D<double> Contour::indefinite_integrate_along(
         for (auto& v : integral) { v *= coef; }
     }
 
-    intp::InterpolationFunction1D<double> integral_interp(
+    intp::InterpolationFunction1D<3, double> integral_interp(
         std::make_pair(abscissa.begin(), abscissa.end()),
-        std::make_pair(integral.begin(), integral.end()), 3, true);
+        std::make_pair(integral.begin(), integral.end()), true);
 
     return integral_interp;
 }
