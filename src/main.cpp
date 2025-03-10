@@ -27,9 +27,6 @@ struct Input {
 };
 
 int main(int argc, char** argv) {
-    auto& timer = Timer::get_timer();
-    timer.start("Read g-file");
-
     CLAP_BEGIN(Input)
     CLAP_ADD_USAGE("[OPTION]... INPUT_FILE")
     CLAP_ADD_DESCRIPTION("Transfrom g-file to spdata using in GTC.")
@@ -70,6 +67,18 @@ int main(int argc, char** argv) {
             (std::filesystem::current_path() / "spdata.dat").string();
     }
 
+#if 1
+    const auto& filename = config.input_path;
+    std::ifstream spdata_file(filename);
+    auto spdata_literal = SpdataLiteral::construct_from_input(spdata_file);
+
+    std::ofstream spdata_out_file(config.output_path);
+    spdata_literal.print_to(spdata_out_file);
+
+#else
+    auto& timer = Timer::get_timer();
+    timer.start("Read g-file");
+
     const auto& filename = config.input_path;
     std::ifstream g_file(filename);
     if (!g_file.is_open()) {
@@ -101,6 +110,6 @@ int main(int argc, char** argv) {
 
     timer.pause();
     timer.print();
-
+#endif
     return 0;
 }
