@@ -52,6 +52,7 @@ struct SpdataLiteral {
         std::istream&);
     static SpdataLiteral construct_from_input(std::istream&);
     void print_to(std::ostream&) const;
+    void convert_to_SI(double, double);
 
    private:
     void read_from(std::istream&, std::size_t);

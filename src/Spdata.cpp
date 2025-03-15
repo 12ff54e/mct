@@ -145,7 +145,6 @@ std::tuple<std::size_t, std::size_t, std::size_t> SpdataLiteral::peek_dimension(
     is >> lsp >> lst >> dump_int >> dump_int;
     is >> dump_double >> dump_double;
 
-    auto pos = is.tellg();
     for (std::size_t t = 0; t < lst; ++t) { is >> dump_double; }
     std::string line;
 
@@ -214,7 +213,7 @@ void SpdataLiteral::print_to(std::ostream& os) const {
     os << std::scientific << std::uppercase << std::setprecision(10);
     os << std::setw(18) << psi_wall << std::setw(18) << psi_sep << '\n';
 
-    auto print_2d_flux = [&](auto& field, std::size_t psi) {
+    auto print_2d_flux = [&](const auto& field, std::size_t psi) {
         for (std::size_t c = 0; c < 9; ++c) {
             for (std::size_t t = 0; t < lst + 1; ++t) {
                 os << std::setw(18) << field(psi, c, t % lst);
@@ -247,4 +246,54 @@ void SpdataLiteral::print_to(std::ostream& os) const {
     os << std::setw(18) << 1. << std::setw(18) << 0. << std::setw(18) << 0.
        << '\n';
     os << std::setw(18) << 0. << std::setw(18) << 0. << '\n';
+}
+
+void SpdataLiteral::convert_to_SI(double b0, double r0) {
+    const auto psi_unit_inv = 1. / (r0 * r0 * b0);
+    const auto psi_unit_2_inv = psi_unit_inv * psi_unit_inv;
+
+    auto convert_2d = [&](auto& field, double unit) {
+        for (std::size_t psi = 0; psi < lsp; ++psi) {
+            for (std::size_t c = 0; c < 9; ++c) {
+                for (std::size_t t = 0; t < lst; ++t) {
+                    field(psi, c, t) *=
+                        unit *
+                        (c % 3 == 0 ? 1.
+                         : c % 3 == 1
+                             ? (psi == 0 ? std::sqrt(psi_unit_inv)
+                                         : psi_unit_inv)
+                             : (psi == 0 ? psi_unit_inv : psi_unit_2_inv));
+                }
+            }
+        }
+    };
+
+    auto convert_1d = [&](auto& field, double unit, bool singular = false) {
+        for (std::size_t psi = 0; psi < lsp; ++psi) {
+            for (std::size_t c = 0; c < 3; ++c) {
+                field(psi, c) *=
+                    unit *
+                    (c == 0   ? 1.
+                     : c == 1 ? (psi == 0 && singular ? std::sqrt(psi_unit_inv)
+                                                      : psi_unit_inv)
+                              : (psi == 0 && singular ? psi_unit_inv
+                                                      : psi_unit_2_inv));
+            }
+        }
+    };
+
+    psi_wall /= psi_unit_inv;
+    psi_sep /= psi_unit_inv;
+
+    convert_2d(b, b0);
+    convert_2d(r, r0);
+    convert_2d(z, r0);
+    convert_2d(j, r0 / b0);
+
+    convert_1d(q, 1.);
+    convert_1d(f, r0 * b0);
+    convert_1d(i, r0 * b0);
+    convert_1d(p, 1.);
+    convert_1d(r_minor, 1., true);
+    convert_1d(psi_t, 1. / psi_unit_inv);
 }
