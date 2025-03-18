@@ -4,6 +4,10 @@
 #include "BSplineInterpolation/src/include/Interpolation.hpp"
 #include "GFileRawData.h"
 
+#ifdef MCT_ZERNIKE_SERIES_
+#include "ZernikeSeries.h"
+#endif
+
 class MagneticEquilibrium {
    public:
     // interpolation order of internal use
@@ -43,9 +47,13 @@ class MagneticEquilibrium {
         // - r
         // - z
         // - jacobian
+#ifdef MCT_ZERNIKE_SERIES_
+        // std::array<ZernikeSeries, FIELD_NUM_2D> data_2d;
+#else
         std::array<intp::InterpolationFunction<double, 2, ORDER_OUT>,
                    FIELD_NUM_2D>
             intp_2d;
+#endif
         // - safety_factor
         // - poloidal_current
         // - toroidal_current

@@ -23,11 +23,6 @@ inline int sgn(const Tf& val) {
 }
 
 template <typename T>
-inline T abs(T x) {
-    return std::abs(x);
-}
-
-template <typename T>
 inline T arctan(T x, T y) {
     T atan = std::atan2(y, x);
     return atan < 0 ? static_cast<T>(2 * static_cast<T>(M_PIl) + atan) : atan;
@@ -41,6 +36,26 @@ inline T arctan(const Vec<2, T>& pt) {
 template <typename T>
 inline T lerp(T left, T right, T c) {
     return (static_cast<T>(1) - c) * left + c * right;
+}
+
+constexpr int sqrt_int(int n) {
+    if (n <= 0) return 0;
+    if (n == 1) return 1;
+
+    for (int x = n / 2; true;) {
+        int nx = (x + n / x) / 2;
+        if (nx >= x) { return x; }
+        x = nx;
+    }
+}
+
+constexpr int factorial(int n) {
+    return n == 0 ? 1 : n * factorial(n - 1);
+}
+
+template <typename T>
+constexpr auto abs(T x) {
+    return x < 0 ? -x : x;
 }
 
 // auxilary functions for find root
@@ -168,7 +183,7 @@ Tx cubic_interpolation(const Tx& a,
  */
 template <typename Func, typename TolFunc, typename Tx>
 Tx find_root(const Func& func, const Tx& ax, const Tx& bx, const TolFunc& tol) {
-    using Tf = typename std::result_of<Func(Tx)>::type;
+    using Tf = typename std::invoke_result<Func, Tx>::type;
     // control parameters
 
     const unsigned max_iter = 50;
