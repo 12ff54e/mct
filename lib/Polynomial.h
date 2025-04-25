@@ -7,6 +7,9 @@
 #include <ratio>
 #include <type_traits>
 
+template <typename... Coefs>
+struct Polynomial;
+
 namespace {
 
 template <typename A, typename T, std::size_t... idx>
@@ -33,12 +36,43 @@ constexpr T eval_impl_odd(A arr, T pows, std::index_sequence<idx...>) {
 }
 template <typename A, typename T, std::size_t... idx>
 constexpr T eval_impl_even(A arr, T pows, std::index_sequence<idx...>) {
+    static_cast<void>(arr);  // avoid unused-but-set-parameter warning in gcc
     return eval_impl(std::array<T, sizeof...(idx)>{(
                          arr[2 * idx] + arr[2 * idx + 1] * pows)...},
                      pows * pows);
 }
 
+template <typename P, typename IS>
+struct poly_derivative_helper {};
+
+template <typename... Cs, std::intmax_t... ps>
+struct poly_derivative_helper<Polynomial<Cs...>,
+                              std::integer_sequence<std::intmax_t, ps...>> {
+    using type = Polynomial<std::ratio_multiply<Cs, std::ratio<ps + 1>>...>;
+};
+
+template <typename P, std::size_t n>
+struct poly_derivative_impl {};
+template <typename C, typename... Cs>
+struct poly_derivative_impl<Polynomial<C, Cs...>, 0> {
+    using type = Polynomial<C, Cs...>;
+};
+template <std::size_t n>
+struct poly_derivative_impl<Polynomial<>, n> {
+    using type = Polynomial<std::ratio<0, 1>>;
+};
+template <std::size_t n, typename C, typename... Cs>
+struct poly_derivative_impl<Polynomial<C, Cs...>, n> {
+    using type = typename poly_derivative_impl<
+        typename poly_derivative_helper<
+            Polynomial<Cs...>,
+            std::make_integer_sequence<std::intmax_t, sizeof...(Cs)>>::type,
+        n - 1>::type;
+};
 };  // namespace
+
+template <typename P, std::size_t n>
+using poly_derivative = typename poly_derivative_impl<P, n>::type;
 
 template <typename... Coefs>
 struct Polynomial {
@@ -53,6 +87,11 @@ struct Polynomial {
                     (static_cast<T>(Cs::num) / static_cast<T>(Cs::den))...},
                 x);
         })(Self{});
+    }
+
+    template <std::size_t n, typename T>
+    static constexpr T derivative(T x) {
+        return poly_derivative<Self, n>::eval(x);
     }
 
     template <typename OS>
@@ -105,12 +144,6 @@ struct pad<Polynomial<>, n> {
     using type = typename constant_list<std::ratio<0>, n>::type;
 };
 
-template <typename P, std::size_t n>
-struct right_shift {
-    using type =
-        typename join<typename constant_list<std::ratio<0>, n>::type, P>::type;
-};
-
 template <typename P1, typename P2>
 struct poly_add_impl {};
 
@@ -152,6 +185,12 @@ using poly_scale = typename ::poly_scale_impl<P, T>::type;
 
 namespace {
 
+template <typename P, std::size_t n>
+struct right_shift {
+    using type =
+        typename join<typename constant_list<std::ratio<0>, n>::type, P>::type;
+};
+
 template <typename P1, typename P2>
 struct poly_mul_impl {};
 
@@ -172,5 +211,25 @@ struct poly_mul_impl<Polynomial<C1, C1s...>, P2> {
 
 template <typename P1, typename P2>
 using poly_mul = typename ::poly_mul_impl<P1, P2>::type;
+
+namespace {
+
+// template <typename P, std::size_t n>
+// struct left_shift {};
+//
+// template <typename... Cs>
+// struct left_shift<Polynomial<Cs...>, 0> {
+//     using type = Polynomial<Cs...>;
+// };
+// template <std::size_t n>
+// struct left_shift<Polynomial<>, n> {
+//     using type = Polynomial<>;
+// };
+// template <std::size_t n, typename C, typename... Cs>
+// struct left_shift<Polynomial<C, Cs...>, n> {
+//     using type = left_shift<Polynomial<Cs...>, n - 1>;
+// }
+
+};  // namespace
 
 #endif  // POLYNOMIAL_H
