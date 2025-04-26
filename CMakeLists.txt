@@ -19,6 +19,7 @@ endif()
 
 include_directories(./deps)
 add_compile_definitions($<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:_DEBUG>)
+# add_compile_definitions(MCT_ZERNIKE_SERIES_)
 
 add_executable(mct_exe src/main.cpp src/Spdata.cpp)
 set_property(TARGET mct_exe PROPERTY OUTPUT_NAME mct)
@@ -29,7 +30,7 @@ list(TRANSFORM lib_src_files PREPEND lib/)
 add_library(mct ${lib_src_files})
 target_link_libraries(mct_exe PUBLIC mct)
 
-list(APPEND tests vec-test util-test zernike-test)
+list(APPEND tests vec-test util-test poly-test zernike-test)
 list(LENGTH tests test_num)
 message(STATUS)
 message(STATUS  ${test_num} " tests found: ")
