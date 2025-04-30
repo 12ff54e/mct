@@ -97,7 +97,12 @@ struct Polynomial {
     template <typename OS>
     static void print_to(OS& out) {
         ([&out]<typename... Cs>(Polynomial<Cs...>) {
-            (..., (out << Cs::num << "/" << Cs::den << ","));
+            const auto print_ratio = [&out]<typename C>(C) {
+                out << C::num;
+                if (C::den != 1) { out << '/' << C::den; }
+                out << ',';
+            };
+            (..., print_ratio(Cs{}));
         })(Self{});
     }
 };
@@ -177,11 +182,11 @@ struct poly_prepend<C, Polynomial<Cs...>> {
 };
 
 template <typename P>
-struct poly_trim {};
+struct poly_trim_helper {};
 
 template <typename C, typename... Cs>
-struct poly_trim<Polynomial<C, Cs...>> {
-    using tail_trim_result = poly_trim<Polynomial<Cs...>>;
+struct poly_trim_helper<Polynomial<C, Cs...>> {
+    using tail_trim_result = poly_trim_helper<Polynomial<Cs...>>;
 
     static constexpr bool trimming =
         tail_trim_result::trimming && std::is_same_v<C, std::ratio<0>>;
@@ -192,9 +197,17 @@ struct poly_trim<Polynomial<C, Cs...>> {
 };
 
 template <>
-struct poly_trim<Polynomial<>> {
+struct poly_trim_helper<Polynomial<>> {
     static constexpr bool trimming = true;
     using type = Polynomial<>;
+};
+
+template <typename P>
+struct poly_trim {
+    using helper_result = typename poly_trim_helper<P>::type;
+    using type = std::conditional_t<std::is_same_v<helper_result, Polynomial<>>,
+                                    Polynomial<std::ratio<0>>,
+                                    helper_result>;
 };
 
 };  // namespace impl
@@ -263,16 +276,15 @@ struct poly_div_helper {
 template <typename P1, typename P2>
 struct poly_div_impl {
     using q = typename poly_div_helper<P1, P2>::type;
-    using tail_result = poly_div_impl<
-        typename poly_trim<
-            poly_sub<P1, typename poly_mul_impl<q, P2>::type>>::type,
-        P2>;
+    using tail_result =
+        poly_div_impl<poly_sub<P1, typename poly_mul_impl<q, P2>::type>, P2>;
 
     using quotient = poly_add<q, typename tail_result::quotient>;
     using remainder = typename tail_result::remainder;
 };
 template <typename P1, typename P2>
-    requires(P1::order < P2::order)
+    requires(P1::order < P2::order ||
+             std::is_same_v<P1, Polynomial<std::ratio<0>>>)
 struct poly_div_impl<P1, P2> {
     using quotient = Polynomial<std::ratio<0>>;
     using remainder = P1;

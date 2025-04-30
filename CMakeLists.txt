@@ -30,7 +30,7 @@ list(TRANSFORM lib_src_files PREPEND lib/)
 add_library(mct ${lib_src_files})
 target_link_libraries(mct_exe PUBLIC mct)
 
-list(APPEND tests vec-test util-test poly-test zernike-test)
+list(APPEND tests vec-test util-test poly-test bigint-test zernike-test)
 list(LENGTH tests test_num)
 message(STATUS)
 message(STATUS  ${test_num} " tests found: ")
