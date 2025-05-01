@@ -251,7 +251,6 @@ struct poly_mul_impl<Polynomial<C1, C1s...>, P2> {
 
 template <typename P>
 struct poly_leading {};
-
 template <>
 struct poly_leading<Polynomial<>> {
     using type = std::ratio<0>;
@@ -263,6 +262,23 @@ struct poly_leading<Polynomial<C>> {
 template <typename C, typename... Cs>
 struct poly_leading<Polynomial<C, Cs...>> {
     using type = typename poly_leading<Polynomial<Cs...>>::type;
+};
+
+template <typename P>
+struct poly_tail {};
+template <>
+struct poly_tail<Polynomial<>> {
+    using type = Polynomial<>;
+};
+template <typename C>
+struct poly_tail<Polynomial<C>> {
+    using type = Polynomial<>;
+};
+template <typename C, typename... Cs>
+struct poly_tail<Polynomial<C, Cs...>> {
+    using type =
+        typename poly_prepend<C, typename poly_tail<Polynomial<Cs...>>::type>::
+            type;
 };
 
 template <typename P1, typename P2>
