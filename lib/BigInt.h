@@ -14,22 +14,25 @@ static constexpr auto bigint_base = BigInt<Polynomial<>>::base;
 
 namespace impl {
 
-template <typename C, typename P>
+template <typename C, typename P, bool to_positive = true>
 struct normalize_bigint {};
-template <typename C0, typename C1, typename... Cs>
-struct normalize_bigint<C0, Polynomial<C1, Cs...>> {
-    static constexpr std::intmax_t r =
-        ((C0::num + C1::num) % bigint_base + bigint_base) % bigint_base;
+template <bool to_positive, typename C0, typename C1, typename... Cs>
+struct normalize_bigint<C0, Polynomial<C1, Cs...>, to_positive> {
+    static constexpr std::intmax_t r = ((C0::num + C1::num) % bigint_base +
+                                        (to_positive ? 1 : -1) * bigint_base) %
+                                       bigint_base;
     using type = typename poly_prepend<
         std::ratio<r>,
         typename normalize_bigint<
             std::ratio<(C0::num + C1::num - r) / bigint_base>,
-            Polynomial<Cs...>>::type>::type;
+            Polynomial<Cs...>,
+            to_positive>::type>::type;
 };
-template <typename C>
-struct normalize_bigint<C, Polynomial<>> {
+template <bool to_positive, typename C>
+struct normalize_bigint<C, Polynomial<>, to_positive> {
     static constexpr std::intmax_t r =
-        (C::num % bigint_base + bigint_base) % bigint_base;
+        (C::num % bigint_base + (to_positive ? 1 : -1) * bigint_base) %
+        bigint_base;
     using type =
         Polynomial<std::ratio<r>, std::ratio<(C::num - r) / bigint_base>>;
 };
@@ -135,7 +138,9 @@ struct bigint_add_impl {
 template <typename P1, typename P2>
 struct bigint_sub_impl {
     using type =
-        typename normalize_bigint<std::ratio<0>, poly_sub<P1, P2>>::type;
+        typename normalize_bigint<std::ratio<0>,
+                                  poly_sub<P1, P2>,
+                                  bigint_less<P2, P1>::type::value>::type;
 };
 
 template <typename P>

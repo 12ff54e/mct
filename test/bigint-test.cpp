@@ -5,21 +5,7 @@
 
 int main() {
     Assertion assertion;
-    {
-        using i0 = BigInt<Polynomial<std::ratio<001>, std::ratio<1>>>;
-        using i1 = BigInt<Polynomial<std::ratio<499>>>;
-        assertion.test(std::is_same_v<bigint_sub<i0, i1>,
-                                      BigInt<Polynomial<std::ratio<502>>>>,
-                       "subtraction test");
-    }
-    {
-        using i0 = BigInt<Polynomial<std::ratio<499>, std::ratio<1>>>;
-        using i1 = BigInt<Polynomial<std::ratio<999>>>;
-        assertion.test(
-            std::is_same_v<bigint_add<i0, i1>,
-                           BigInt<Polynomial<std::ratio<498>, std::ratio<2>>>>,
-            "addition test");
-    }
+
     {
         using i0 = BigInt<Polynomial<std::ratio<499>, std::ratio<1>>>;
         using i1 = BigInt<Polynomial<std::ratio<999>>>;
@@ -33,6 +19,27 @@ int main() {
         assertion.test(bigint_equal_v<i0, i1> && bigint_equal_v<i1, i0> &&
                            !bigint_equal_v<i0, i2>,
                        "equal test");
+    }
+    {
+        using i0 = BigInt<Polynomial<std::ratio<499>, std::ratio<1>>>;
+        using i1 = BigInt<Polynomial<std::ratio<999>>>;
+        assertion.test(
+            std::is_same_v<bigint_add<i0, i1>,
+                           BigInt<Polynomial<std::ratio<498>, std::ratio<2>>>>,
+            "addition test");
+    }
+    {
+        using i0 = BigInt<Polynomial<std::ratio<1>, std::ratio<1>>>;
+        using i1 = BigInt<Polynomial<std::ratio<499>>>;
+        using i2 =
+            BigInt<Polynomial<std::ratio<0>, std::ratio<0>, std::ratio<1>>>;
+        assertion.test(
+            std::is_same_v<bigint_sub<i0, i1>,
+                           BigInt<Polynomial<std::ratio<502>>>> &&
+                std::is_same_v<
+                    bigint_sub<i0, i2>,
+                    BigInt<Polynomial<std::ratio<-999>, std::ratio<-998>>>>,
+            "subtraction test");
     }
     {
         using i0 = BigInt<Polynomial<std::ratio<999>, std::ratio<1>>>;
