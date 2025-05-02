@@ -66,7 +66,11 @@ int main() {
             std::is_same_v<to_bigint<1234567>,
                            BigInt<Polynomial<std::ratio<567>, std::ratio<234>,
                                              std::ratio<1>>>>,
-            "conversion test");
+            "int -> BigInt test");
+        assertion.test(
+            from_bigint_v<BigInt<Polynomial<std::ratio<567>, std::ratio<234>,
+                                            std::ratio<1>>>> == 1234567,
+            "BigInt -> int test");
     }
     {
         assertion.test(

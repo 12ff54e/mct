@@ -220,6 +220,20 @@ struct to_bigint_impl<0> {
     using type = Polynomial<std::ratio<0>>;
 };
 
+template <typename>
+struct from_bigint_impl;
+template <typename C, typename... Cs>
+struct from_bigint_impl<Polynomial<C, Cs...>> {
+    using type = std::integral_constant<
+        std::intmax_t,
+        C::num +
+            bigint_base * from_bigint_impl<Polynomial<Cs...>>::type::value>;
+};
+template <>
+struct from_bigint_impl<Polynomial<>> {
+    using type = std::integral_constant<std::intmax_t, 0>;
+};
+
 template <typename C, typename P>
 struct bigint_predecessor_helper {};
 template <typename C0, typename C1, typename... Cs>
@@ -276,6 +290,12 @@ using bigint_div = BigInt<typename impl::poly_trim<
 template <std::intmax_t I>
 using to_bigint = BigInt<
     typename impl::poly_trim<typename impl::to_bigint_impl<I>::type>::type>;
+
+template <typename B>
+using from_bigint = typename impl::from_bigint_impl<typename B::internal>::type;
+
+template <typename B>
+constexpr std::intmax_t from_bigint_v = from_bigint<B>::value;
 
 template <typename B1, typename B2>
 using bigint_factorial_partial = BigInt<typename impl::poly_trim<
