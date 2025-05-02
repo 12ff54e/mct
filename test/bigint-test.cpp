@@ -19,6 +19,9 @@ int main() {
         assertion.test(bigint_equal_v<i0, i1> && bigint_equal_v<i1, i0> &&
                            !bigint_equal_v<i0, i2>,
                        "equal test");
+        assertion.test(
+            bigint_less_equal_v<i0, i1> && bigint_less_equal_v<i0, i2>,
+            "less_equal test");
     }
     {
         using i0 = BigInt<Polynomial<std::ratio<499>, std::ratio<1>>>;
