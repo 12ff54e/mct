@@ -54,13 +54,13 @@ int main() {
             "multiplication test");
     }
 
-    // {
-    //     using i0 = BigInt<Polynomial<std::ratio<200>, std::ratio<1>>>;
-    //     using i1 = BigInt<Polynomial<std::ratio<240>>>;
-    //     assertion.test(std::is_same_v<bigint_div<i0, i1>,
-    //                                   BigInt<Polynomial<std::ratio<5>>>>,
-    //                    "division test");
-    // }
+    {
+        using i0 = BigInt<Polynomial<std::ratio<200>, std::ratio<1>>>;
+        using i1 = BigInt<Polynomial<std::ratio<240>>>;
+        assertion.test(std::is_same_v<bigint_div<i0, i1>,
+                                      BigInt<Polynomial<std::ratio<5>>>>,
+                       "division test");
+    }
     {
         assertion.test(
             std::is_same_v<to_bigint<1234567>,
@@ -75,12 +75,12 @@ int main() {
                                              std::ratio<3>>>>,
             "factorial test");
 
-        //     assertion.test(
-        //         std::is_same_v<
-        //             bigint_factorial_partial<to_bigint<20>, to_bigint<10>>,
-        //             bigint_div<bigint_factorial<to_bigint<20>>,
-        //                        bigint_factorial<to_bigint<10>>>>,
-        //         "partial factorial test");
+        assertion.test(
+            std::is_same_v<
+                bigint_factorial_partial<to_bigint<20>, to_bigint<10>>,
+                bigint_div<bigint_factorial<to_bigint<20>>,
+                           bigint_factorial<to_bigint<10>>>>,
+            "partial factorial test");
     }
     return assertion.status();
 }

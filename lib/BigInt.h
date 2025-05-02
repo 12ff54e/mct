@@ -157,23 +157,40 @@ struct collapse_leading_term<Polynomial<C>> {
 
 template <typename P1, typename P2>
 struct bigint_div_helper {
-    using type = std::conditional_t<
-        std::ratio_greater_v<typename poly_leading<P1>::type,
-                             typename poly_leading<P2>::type>,
-        typename right_shift<
-            Polynomial<std::ratio<poly_leading<P1>::type::num /
-                                  (poly_leading<P2>::type::num + 1)>>,
-            P1::order - P2::order>::type,
-        typename bigint_div_helper<typename collapse_leading_term<P1>::type,
-                                   P2>::type>;
+    using type = typename right_shift<
+        Polynomial<std::ratio<poly_leading<P1>::type::num /
+                              (poly_leading<P2>::type::num + 1)>>,
+        P1::order - P2::order>::type;
+};
+
+template <bool>
+struct if_else {
+    template <typename T, typename>
+    using type = T;
+};
+
+template <>
+struct if_else<false> {
+    template <typename, typename T>
+    using type = T;
 };
 
 template <typename P1, typename P2>
 struct bigint_div_impl {
-    using q = typename bigint_div_helper<P1, P2>::type;
+    using q = typename if_else<
+        std::ratio_greater_v<typename poly_leading<P1>::type,
+                             typename poly_leading<P2>::type>>::
+        template type<
+            bigint_div_helper<P1, P2>,
+            bigint_div_helper<typename collapse_leading_term<P1>::type,
+                              P2>>::type;
+
     using sub_type = bigint_div_impl<
-        typename bigint_sub_impl<P1,
-                                 typename bigint_mul_impl<q, P2>::type>::type,
+        typename poly_trim<typename normalize_bigint<
+            std::ratio<0>,
+            typename bigint_sub_impl<
+                P1,
+                typename bigint_mul_impl<q, P2>::type>::type>::type>::type,
         P2>;
 
     using quotient =
@@ -181,9 +198,16 @@ struct bigint_div_impl {
     using remainder = typename sub_type::remainder;
 };
 
-// template <typename P1, typename P2>
-//     requires(bigint_less_equal_v<BigInt<P1>, BigInt<P2>>)
-// struct bigint_div_impl<P1, P2> {};
+template <typename P1, typename P2>
+    requires(bigint_less_equal_v<BigInt<P1>, BigInt<P2>>)
+struct bigint_div_impl<P1, P2> {
+    using quotient = std::conditional_t<bigint_equal_v<BigInt<P1>, BigInt<P2>>,
+                                        Polynomial<std::ratio<1>>,
+                                        Polynomial<std::ratio<0>>>;
+    using remainder = std::conditional_t<bigint_equal_v<BigInt<P1>, BigInt<P2>>,
+                                         Polynomial<std::ratio<0>>,
+                                         P1>;
+};
 
 template <std::intmax_t I>
 struct to_bigint_impl {
@@ -244,10 +268,10 @@ using bigint_sub = BigInt<typename impl::poly_trim<
     typename impl::bigint_sub_impl<typename B1::internal,
                                    typename B2::internal>::type>::type>;
 
-// template <typename B1, typename B2>
-// using bigint_div =
-//     BigInt<typename impl::bigint_div_impl<typename B1::internal,
-//                                           typename B2::internal>::type>;
+template <typename B1, typename B2>
+using bigint_div = BigInt<typename impl::poly_trim<
+    typename impl::bigint_div_impl<typename B1::internal,
+                                   typename B2::internal>::quotient>::type>;
 
 template <std::intmax_t I>
 using to_bigint = BigInt<
