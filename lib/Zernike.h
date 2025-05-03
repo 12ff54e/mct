@@ -19,19 +19,19 @@
 namespace Zernike {
 
 // OSA/ANSI standard indices
-constexpr int index_l(int n, int m) {
-    return (n + 1) * n / 2 + (m + n) / 2;
+constexpr std::size_t index_l(auto n, auto m) {
+    return static_cast<std::size_t>((n + 1) * n / 2 + (m + n) / 2);
 }
-constexpr int index_n(int l) {
-    return (util::sqrt_int(8 * l + 1) - 1) / 2;
+constexpr int index_n(auto l) {
+    return (util::sqrt_int(8 * static_cast<int>(l) + 1) - 1) / 2;
 }
-constexpr int index_m(int l) {
+constexpr int index_m(auto l) {
     const int n = index_n(l);
-    return 2 * l - (n + 2) * n;
+    return 2 * static_cast<int>(l) - (n + 2) * n;
 }
 constexpr std::pair<int, int> index_nm(int l) {
     const int n = index_n(l);
-    return {n, 2 * l - (n + 2) * n};
+    return {n, 2 * static_cast<int>(l) - (n + 2) * n};
 }
 
 namespace {
@@ -118,7 +118,7 @@ struct Series {
         : order(radial_order) {}
     Series(std::size_t radial_order, std::vector<val_type> coefficients)
         : order(radial_order), coef{std::move(coefficients)} {
-        const int count = index_l(radial_order, radial_order) + 1;
+        const auto count = index_l(radial_order, radial_order) + 1;
         if (count != coef.size()) {
             std::cout << "[Zernike::Series] Specified order and the number of "
                          "provided coefficients do not match each order.\n";
@@ -133,6 +133,84 @@ struct Series {
                           << count << ".\n";
             }
             coef.resize(count);
+        }
+    }
+    template <typename U, typename V>
+    Series(std::size_t radial_order,
+           std::size_t radial_size,
+           std::size_t polar_size,
+           const U& data,
+           const V& radial_coord)
+        : order(radial_order), coef(index_l(radial_order, radial_order) + 1) {
+        // force n to be multiplier of 4 can reduce cache size to n/4
+        const val_type theta_delta =
+            2 * M_PI / static_cast<val_type>(polar_size);
+        std::vector<std::array<double, 2>> sincos(polar_size);
+        for (std::size_t i = 0; i < polar_size; ++i) {
+            const auto theta = static_cast<val_type>(i) * theta_delta;
+            sincos[i][0] = std::sin(theta);
+            sincos[i][1] = std::cos(theta);
+        }
+
+        // store integral of {sin,cos}(theta)*f(r,theta)
+        std::vector<val_type> circ_integral(order * 2 + 1);
+
+        std::vector<val_type> f0(coef.size());
+        std::vector<val_type> f1(coef.size());
+        std::vector<val_type> f2(coef.size());
+        val_type dr0 = 0;
+        val_type dr1 = 0;
+
+        const auto calc_integrand = [&](auto& vals, auto r) {
+            for (std::size_t l = 0; l < coef.size(); ++l) {
+                const auto n = index_n(l);
+                const auto m = index_m(l);
+                vals[l] = circ_integral[static_cast<std::size_t>(m) + order] *
+                          radial_at(n, util::abs(m), r) * r;
+            }
+        };
+        calc_integrand(f0, 0.);
+
+        val_type r0 = 0.;
+        for (std::size_t j = 0; j < radial_size; ++j) {
+            for (std::size_t i = 0; i < polar_size; ++i) {
+                for (std::size_t m = 0; m < circ_integral.size(); ++m) {
+                    const val_type simpson_coef =
+                        (i == 0 || i == polar_size - 1
+                             ? polar_size % 2 == 0 ? 2. / 3. : 5. / 6.
+                             : static_cast<val_type>(2 * (1 + m % 2)) / 3) *
+                        theta_delta;
+                    circ_integral[m] += simpson_coef *
+                                        sincos[i * util::abs(m - order) %
+                                               polar_size][m < order ? 0 : 1] *
+                                        data(j, i);
+                }
+            }
+
+            // use sqrt(\psi_t/\psi_w) as radial coordinate
+            const val_type r = radial_coord[j];
+            if (j % 2 == 0) {
+                dr0 = r - r0;
+                calc_integrand(f1, r);
+            } else {
+                dr1 = r - r0;
+                calc_integrand(f2, r);
+                for (std::size_t l = 0; l < coef.size(); ++l) {
+                    coef[l] += (dr0 + dr1) / 6. *
+                               (2. * (f0[l] + f1[l] + f2[l]) +
+                                dr0 / dr1 * (f1[l] - f2[l]) +
+                                dr1 / dr0 * (f1[l] - f0[l]));
+                    f0[l] = f2[l];
+                }
+            }
+            for (auto& v : circ_integral) { v = 0.; }
+            r0 = r;
+        }
+
+        for (std::size_t l = 0; l < coef.size(); ++l) {
+            const auto n = index_n(l);
+            const auto m = index_m(l);
+            coef[l] *= (n + 1) * (m == 0 ? 1. : 2.) / M_PI;
         }
     }
 
@@ -156,7 +234,8 @@ struct Series {
         val_type f{};
         for (std::size_t l = 0; l < coef.size(); ++l) {
             const auto [n, m] = index_nm(static_cast<int>(l));
-            const double t = m * theta + .5 * td * M_PI;
+            const val_type t =
+                m * theta + .5 * static_cast<val_type>(td) * M_PI;
 
             f += coef[l] * radial_at(n, m, r, rd) * std::pow(m, td) *
                  (m == 0  ? td > 0 ? 0. : 1.

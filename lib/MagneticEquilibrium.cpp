@@ -313,85 +313,13 @@ MagneticEquilibrium::create_2d_spline_(
     static_cast<void>(psi_sample);
     // The Zernike series is actually representing f(r, theta+delta/2)
 
-    const auto nt = data.dim_size(1) - 1;
-    // force n to be multiplier of 4 can reduce cache size to n/4
-    std::vector<std::array<double, 2>> sincos(nt);
-    for (std::size_t i = 0; i < nt; ++i) {
-        const auto theta = static_cast<double>(i) * theta_delta_;
-        sincos[i][0] = std::sin(theta);
-        sincos[i][1] = std::cos(theta);
-    }
+    std::vector<double> r(spdata_raw_.data_1d[5]);
+    const auto psi_w = r[r.size() - 1];
+    for (auto& v : r) { v = std::sqrt(v / psi_w); }
 
-    using namespace Zernike;
     const std::size_t zernike_order =
-        nt / 20 > MCT_MAX_ZERNIKE_ORDER ? MCT_MAX_ZERNIKE_ORDER : nt / 20;
-    // store integral of {sin,cos}(theta)*f(r,theta)
-    std::vector<double> circ_integral(zernike_order * 2 + 1);
-    std::vector<double> zernike_coef(
-        static_cast<std::size_t>(index_l(zernike_order, zernike_order) + 1));
-
-    const auto& psi_t = spdata_raw_.data_1d[5];
-    std::vector<double> f0(zernike_coef.size());
-    std::vector<double> f1(zernike_coef.size());
-    std::vector<double> f2(zernike_coef.size());
-    double dr0 = 0;
-    double dr1 = 0;
-
-    auto calc_integrand = [&](auto& vals, auto r) {
-        for (std::size_t l = 0; l < zernike_coef.size(); ++l) {
-            const auto n = index_n(l);
-            const auto m = index_m(l);
-            vals[l] =
-                circ_integral[static_cast<std::size_t>(m + zernike_order)] *
-                radial_at(n, util::abs(m), r) * r;
-        }
-    };
-    calc_integrand(f0, 0.);
-
-    double r0 = 0.;
-    const double psi_w = psi_t[psi_t.size() - 1];
-    for (std::size_t j = 0; j < psi_t.size(); ++j) {
-        for (std::size_t i = 0; i < nt; ++i) {
-            for (int m = 0; m < circ_integral.size(); ++m) {
-                const double coef =
-                    (i == 0 || i == nt - 1
-                         ? nt % 2 == 0 ? 2. / 3. : 5. / 6.
-                         : static_cast<double>(2 * (1 + m % 2)) / 3) *
-                    theta_delta_;
-                circ_integral[m] += coef *
-                                    sincos[i * util::abs(m - zernike_order) %
-                                           nt][m < zernike_order ? 0 : 1] *
-                                    data(j, i);
-            }
-        }
-
-        // use sqrt(\psi_t/\psi_w) as radial coordinate
-        const double r = std::sqrt(psi_t[j] / psi_w);
-        if (j % 2 == 0) {
-            dr0 = r - r0;
-            calc_integrand(f1, r);
-        } else {
-            dr1 = r - r0;
-            calc_integrand(f2, r);
-            for (std::size_t l = 0; l < zernike_coef.size(); ++l) {
-                zernike_coef[l] +=
-                    (dr0 + dr1) / 6. *
-                    (2. * (f0[l] + f1[l] + f2[l]) +
-                     dr0 / dr1 * (f1[l] - f2[l]) + dr1 / dr0 * (f1[l] - f0[l]));
-                f0[l] = f2[l];
-            }
-        }
-        for (auto& v : circ_integral) { v = 0.; }
-        r0 = r;
-    }
-
-    for (std::size_t l = 0; l < zernike_coef.size(); ++l) {
-        const auto n = index_n(l);
-        const auto m = index_m(l);
-        zernike_coef[l] *= (n + 1) * (m == 0 ? 1. : 2.) / M_PI;
-    }
-
-    return {zernike_order, zernike_coef};
+        lst / 20 > MCT_MAX_ZERNIKE_ORDER ? MCT_MAX_ZERNIKE_ORDER : lst / 20;
+    return {zernike_order, r.size(), lst, data, r};
 #else
     // interpolate the even-spaced data
     intp::InterpolationFunction<double, 2, ORDER_OUT> data_intp(
