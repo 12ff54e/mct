@@ -19,7 +19,7 @@ endif()
 
 include_directories(./deps)
 add_compile_definitions($<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:_DEBUG>)
-# add_compile_definitions(MCT_ZERNIKE_SERIES_)
+add_compile_definitions(MCT_ZERNIKE_SERIES_)
 
 add_executable(mct_exe src/main.cpp src/Spdata.cpp)
 set_property(TARGET mct_exe PROPERTY OUTPUT_NAME mct)

@@ -5,7 +5,7 @@
 #include "GFileRawData.h"
 
 #ifdef MCT_ZERNIKE_SERIES_
-#include "ZernikeSeries.h"
+#include "Zernike.h"
 #endif
 
 class MagneticEquilibrium {
@@ -48,12 +48,12 @@ class MagneticEquilibrium {
         // - z
         // - jacobian
 #ifdef MCT_ZERNIKE_SERIES_
-        // std::array<ZernikeSeries, FIELD_NUM_2D> data_2d;
+        std::array<Zernike::Series<double>, FIELD_NUM_2D>
 #else
         std::array<intp::InterpolationFunction<double, 2, ORDER_OUT>,
                    FIELD_NUM_2D>
-            intp_2d;
 #endif
+            intp_2d;
         // - safety_factor
         // - poloidal_current
         // - toroidal_current
@@ -122,9 +122,13 @@ class MagneticEquilibrium {
     MagneticEquilibriumRaw_ generate_boozer_coordinate_(const GFileRawData&,
                                                         std::size_t,
                                                         double);
-    intp::InterpolationFunction<double, 2, ORDER_OUT> create_2d_spline_(
-        const intp::Mesh<double, 2>&,
-        const std::vector<double>&) const;
+#ifdef MCT_ZERNIKE_SERIES_
+    Zernike::Series<double>
+#else
+    intp::InterpolationFunction<double, 2, ORDER_OUT>
+#endif
+    create_2d_spline_(const intp::Mesh<double, 2>&,
+                      const std::vector<double>&) const;
     intp::InterpolationFunction1D<ORDER_OUT, double> create_1d_spline_(
         const std::vector<double>&,
         const std::vector<double>&) const;
