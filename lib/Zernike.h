@@ -181,14 +181,14 @@ struct Series {
                              ? 5. / 6.
                              : static_cast<val_type>(2 * (1 + i % 2)) / 3.) *
                         theta_delta;
-                    circ_integral[m] += simpson_coef *
-                                        sincos[i * util::abs(m - order) %
-                                               polar_size][m < order ? 0 : 1] *
-                                        data(j, i);
+                    circ_integral[m] +=
+                        simpson_coef *
+                        sincos[i * (m > order ? m - order : order - m) %
+                               polar_size][m < order ? 0 : 1] *
+                        data(j, i);
                 }
             }
 
-            // use sqrt(\psi_t/\psi_w) as radial coordinate
             const val_type r = radial_coord[j];
             if (j % 2 == 0) {
                 dr0 = r - r0;
