@@ -165,7 +165,8 @@ struct Series {
             for (std::size_t l = 0; l < coef.size(); ++l) {
                 const auto n = index_n(l);
                 const auto m = index_m(l);
-                vals[l] = circ_integral[static_cast<std::size_t>(m) + order] *
+                vals[l] = circ_integral[static_cast<std::size_t>(
+                              m + static_cast<int>(order))] *
                           radial_at(n, util::abs(m), r) * r;
             }
         };
@@ -176,9 +177,9 @@ struct Series {
             for (std::size_t i = 0; i < polar_size; ++i) {
                 for (std::size_t m = 0; m < circ_integral.size(); ++m) {
                     const val_type simpson_coef =
-                        (i == 0 || i == polar_size - 1
-                             ? polar_size % 2 == 0 ? 2. / 3. : 5. / 6.
-                             : static_cast<val_type>(2 * (1 + m % 2)) / 3) *
+                        ((i == 0 || i == polar_size - 1) && polar_size % 2 != 0
+                             ? 5. / 6.
+                             : static_cast<val_type>(2 * (1 + i % 2)) / 3.) *
                         theta_delta;
                     circ_integral[m] += simpson_coef *
                                         sincos[i * util::abs(m - order) %
