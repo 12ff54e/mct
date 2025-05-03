@@ -106,19 +106,7 @@ struct Wrapper : public WrapperBase {
 
 }  // namespace
 
-static double radial_at(int n, int m, double r, std::size_t d = 0) {
-    constexpr auto radial_polynomial_count =
-        radial_index2to1(1 + MCT_MAX_ZERNIKE_ORDER, 0);
-    static auto zernike_radials =
-        ([]<auto... l>(std::integer_sequence<int, l...>)
-             -> std::array<std::unique_ptr<WrapperBase>,
-                           radial_polynomial_count> {
-            return {std::make_unique<
-                Wrapper<radial_index_n(l), radial_index_m(l)>>()...};
-        })(std::make_integer_sequence<int, radial_polynomial_count>{});
-    return zernike_radials[static_cast<std::size_t>(radial_index2to1(n, m))]
-        ->drvt(d, r);
-}
+double radial_at(int n, int m, double r, std::size_t d = 0);
 
 template <typename T>
 struct Series {
@@ -186,3 +174,21 @@ struct Series {
 
 }  // namespace Zernike
 #endif  // ZERNIKE_H
+
+#ifdef MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
+namespace Zernike {
+double radial_at(int n, int m, double r, std::size_t d) {
+    constexpr auto radial_polynomial_count =
+        radial_index2to1(1 + MCT_MAX_ZERNIKE_ORDER, 0);
+    static auto zernike_radials =
+        ([]<auto... l>(std::integer_sequence<int, l...>)
+             -> std::array<std::unique_ptr<WrapperBase>,
+                           radial_polynomial_count> {
+            return {std::make_unique<
+                Wrapper<radial_index_n(l), radial_index_m(l)>>()...};
+        })(std::make_integer_sequence<int, radial_polynomial_count>{});
+    return zernike_radials[static_cast<std::size_t>(radial_index2to1(n, m))]
+        ->drvt(d, r);
+}
+}  // namespace Zernike
+#endif

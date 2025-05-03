@@ -5,6 +5,9 @@
 #include "Contour.h"
 #include "MagneticEquilibrium.h"
 
+#define MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
+#include "Zernike.h"
+
 MagneticEquilibrium::MagneticEquilibriumRaw_
 MagneticEquilibrium::generate_boozer_coordinate_(
     const GFileRawData& g_file_data,

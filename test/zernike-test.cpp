@@ -3,6 +3,7 @@
 #include <iostream>
 
 #define MCT_MAX_ZERNIKE_ORDER 5
+#define MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
 #include "../lib/Zernike.h"
 
 using z_r = std::ratio<0>;
