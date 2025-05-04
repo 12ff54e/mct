@@ -317,8 +317,9 @@ MagneticEquilibrium::create_2d_spline_(
     const auto psi_w = r[r.size() - 1];
     for (auto& v : r) { v = std::sqrt(v / psi_w); }
 
-    const std::size_t zernike_order =
-        lst / 20 > MCT_MAX_ZERNIKE_ORDER ? MCT_MAX_ZERNIKE_ORDER : lst / 20;
+    const std::size_t zernike_order = lst / 5 > MCT_MAX_ZERNIKE_POLAR_ORDER
+                                          ? MCT_MAX_ZERNIKE_POLAR_ORDER
+                                          : lst / 5;
     return {zernike_order, r.size(), lst, data, r};
 #else
     // interpolate the even-spaced data

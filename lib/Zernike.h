@@ -12,8 +12,8 @@
 #include "Polynomial.h"
 #include "util.h"
 
-#ifndef MCT_MAX_ZERNIKE_ORDER
-#define MCT_MAX_ZERNIKE_ORDER 14
+#ifndef MCT_MAX_ZERNIKE_POLAR_ORDER
+#define MCT_MAX_ZERNIKE_POLAR_ORDER 20
 #endif
 
 namespace Zernike {
@@ -29,9 +29,34 @@ constexpr int index_m(auto l) {
     const int n = index_n(l);
     return 2 * static_cast<int>(l) - (n + 2) * n;
 }
-constexpr std::pair<int, int> index_nm(int l) {
+constexpr std::pair<int, int> index_nm(auto l) {
     const int n = index_n(l);
     return {n, 2 * static_cast<int>(l) - (n + 2) * n};
+}
+
+constexpr std::size_t basic_cap(auto mt) {
+    return mt * (mt + 2);
+}
+constexpr std::size_t basic_index_l(auto n, auto m, auto mt) {
+    return static_cast<std::size_t>(
+        n <= mt ? index_l(n, m)
+                : basic_cap(mt) - index_l(2 * mt - n, -static_cast<int>(m)));
+}
+constexpr int basic_index_n(auto l, auto mt) {
+    const auto t = basic_cap(mt);
+    return 2 * l < t ? inedx_n(l) : 2 * mt - index_n(t - l);
+}
+constexpr int basic_index_m(auto l, auto mt) {
+    const auto t = basic_cap(mt);
+    return 2 * l < t ? index_m(l) : -index_m(t - l);
+}
+constexpr std::pair<int, int> basic_index_nm(auto l, auto mt) {
+    const auto t = basic_cap(mt);
+    return 2 * static_cast<std::size_t>(l) < t
+               ? index_nm(l)
+               : (([mt](auto p) -> decltype(p) {
+                     return {2 * mt - p.first, -p.second};
+                 })(index_nm(t - l)));
 }
 
 namespace {
@@ -64,7 +89,7 @@ struct RadialPolynomial {
                            Polynomial<std::ratio<0>>>;
 };
 
-constexpr int radial_index2to1(int n, int m) {
+constexpr int radial_index_l(int n, int m) {
     return (n + 1) * (n + 1) / 4 + m / 2;
 }
 
@@ -74,7 +99,45 @@ constexpr int radial_index_n(int l) {
 
 constexpr int radial_index_m(int l) {
     const int n = radial_index_n(l);
-    return 2 * (l - radial_index2to1(n, 0)) + n % 2;
+    return 2 * l - n * (n + 2) / 2;
+}
+
+constexpr std::pair<int, int> radial_index_nm(int l) {
+    const int n = radial_index_n(l);
+    return {n, 2 * l - n * (n + 2) / 2};
+}
+
+// last index
+constexpr int basic_radial_cap(int mt = MCT_MAX_ZERNIKE_POLAR_ORDER) {
+    return mt * (mt + 3) / 2;
+}
+
+constexpr int basic_radial_index_l(int n,
+                                   int m,
+                                   int mt = MCT_MAX_ZERNIKE_POLAR_ORDER) {
+    return n <= mt ? radial_index_l(n, m)
+                   : basic_radial_cap(mt) - radial_index_l(2 * mt - n, m);
+}
+
+constexpr int basic_radial_index_n(int l,
+                                   int mt = MCT_MAX_ZERNIKE_POLAR_ORDER) {
+    const auto t = basic_radial_cap(mt);
+    return 2 * l < t ? radial_index_n(l) : 2 * mt - radial_index_n(t - l);
+}
+
+constexpr int basic_radial_index_m(int l,
+                                   int mt = MCT_MAX_ZERNIKE_POLAR_ORDER) {
+    const auto t = basic_radial_cap(mt);
+    return 2 * l < t ? radial_index_m(l) : radial_index_m(t - l);
+}
+
+constexpr std::pair<int, int> basic_radial_index_nm(
+    int l,
+    int mt = MCT_MAX_ZERNIKE_POLAR_ORDER) {
+    const auto t = basic_radial_cap(mt);
+    return 2 * l < t ? radial_index_nm(l) : (([mt](auto p) -> decltype(p) {
+        return {2 * mt - p.first, p.second};
+    })(radial_index_nm(t - l)));
 }
 
 struct WrapperBase {
@@ -112,13 +175,14 @@ template <typename T>
 struct Series {
     using val_type = T;
 
-    const std::size_t order;
+    const std::size_t order;  // maximum polar order
+    //  Maximum radial order = 2 * order
 
-    Series(std::size_t radial_order = MCT_MAX_ZERNIKE_ORDER)
-        : order(radial_order) {}
-    Series(std::size_t radial_order, std::vector<val_type> coefficients)
-        : order(radial_order), coef{std::move(coefficients)} {
-        const auto count = index_l(radial_order, radial_order) + 1;
+    Series(std::size_t polar_order = MCT_MAX_ZERNIKE_POLAR_ORDER)
+        : order(polar_order), coef(basic_cap(polar_order) + 1) {}
+    Series(std::size_t polar_order, std::vector<val_type> coefficients)
+        : order(polar_order), coef{std::move(coefficients)} {
+        const auto count = basic_cap(order) + 1;
         if (count != coef.size()) {
             std::cout << "[Zernike::Series] Specified order and the number of "
                          "provided coefficients do not match each order.\n";
@@ -135,13 +199,14 @@ struct Series {
             coef.resize(count);
         }
     }
+
     template <typename U, typename V>
-    Series(std::size_t radial_order,
+    Series(std::size_t polar_order,
            std::size_t radial_size,
            std::size_t polar_size,
            const U& data,
            const V& radial_coord)
-        : order(radial_order), coef(index_l(radial_order, radial_order) + 1) {
+        : Series(polar_order) {
         // force n to be multiplier of 4 can reduce cache size to n/4
         const val_type theta_delta =
             2 * M_PI / static_cast<val_type>(polar_size);
@@ -152,7 +217,7 @@ struct Series {
             sincos[i][1] = std::cos(theta);
         }
 
-        // store integral of {sin,cos}(theta)*f(r,theta)
+        // store integral of {sin,cos}(m * theta)*f(r,theta)
         std::vector<val_type> circ_integral(order * 2 + 1);
 
         std::vector<val_type> f0(coef.size());
@@ -163,8 +228,7 @@ struct Series {
 
         const auto calc_integrand = [&](auto& vals, auto r) {
             for (std::size_t l = 0; l < coef.size(); ++l) {
-                const auto n = index_n(l);
-                const auto m = index_m(l);
+                const auto [n, m] = basic_index_nm(l, order);
                 vals[l] = circ_integral[static_cast<std::size_t>(
                               m + static_cast<int>(order))] *
                           radial_at(n, util::abs(m), r) * r;
@@ -209,8 +273,7 @@ struct Series {
         }
 
         for (std::size_t l = 0; l < coef.size(); ++l) {
-            const auto n = index_n(l);
-            const auto m = index_m(l);
+            const auto [n, m] = basic_index_nm(l, order);
             coef[l] *= (n + 1) * (m == 0 ? 1. : 2.) / M_PI;
         }
     }
@@ -218,10 +281,10 @@ struct Series {
     val_type operator()(val_type r, val_type theta) const {
         val_type f{};
         for (std::size_t l = 0; l < coef.size(); ++l) {
-            const auto [n, m] = index_nm(static_cast<int>(l));
+            const auto [n, m] = basic_index_nm(l, order);
             f += coef[l] * radial_at(n, m, r) *
                  (m == 0  ? 1.
-                  : m < 0 ? std::sin(m * theta)
+                  : m < 0 ? std::sin(-m * theta)
                           : std::cos(m * theta));
         }
         return f;
@@ -234,9 +297,9 @@ struct Series {
 
         val_type f{};
         for (std::size_t l = 0; l < coef.size(); ++l) {
-            const auto [n, m] = index_nm(static_cast<int>(l));
+            const auto [n, m] = basic_index_nm(l, order);
             const val_type t =
-                m * theta + .5 * static_cast<val_type>(td) * M_PI;
+                util::abs(m) * theta + .5 * static_cast<val_type>(td) * M_PI;
 
             f += coef[l] * radial_at(n, m, r, rd) * std::pow(m, td) *
                  (m == 0  ? td > 0 ? 0. : 1.
@@ -258,16 +321,15 @@ struct Series {
 #ifdef MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
 namespace Zernike {
 double radial_at(int n, int m, double r, std::size_t d) {
-    constexpr auto radial_polynomial_count =
-        radial_index2to1(1 + MCT_MAX_ZERNIKE_ORDER, 0);
+    constexpr auto radial_polynomial_count = 1 + basic_radial_cap();
     static auto zernike_radials =
         ([]<auto... l>(std::integer_sequence<int, l...>)
              -> std::array<std::unique_ptr<WrapperBase>,
                            radial_polynomial_count> {
-            return {std::make_unique<
-                Wrapper<radial_index_n(l), radial_index_m(l)>>()...};
+            return {std::make_unique<Wrapper<basic_radial_index_n(l),
+                                             basic_radial_index_m(l)>>()...};
         })(std::make_integer_sequence<int, radial_polynomial_count>{});
-    return zernike_radials[static_cast<std::size_t>(radial_index2to1(n, m))]
+    return zernike_radials[static_cast<std::size_t>(basic_radial_index_l(n, m))]
         ->drvt(d, r);
 }
 }  // namespace Zernike

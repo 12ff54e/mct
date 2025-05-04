@@ -4,7 +4,7 @@
 
 #include "BSplineInterpolation/src/include/Mesh.hpp"
 
-#define MCT_MAX_ZERNIKE_ORDER 5
+#define MCT_MAX_ZERNIKE_POLAR_ORDER 6
 #define MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
 #include "../lib/Zernike.h"
 
@@ -46,27 +46,30 @@ int main() {
     constexpr double dt = 2. * M_PI / static_cast<double>(nt);
     for (std::size_t i = 0; i < nr; ++i) {
         rg[i] = static_cast<double>(i + 1) * dr;
+        const double r2 = rg[i] * rg[i];
+        const double r3 = r2 * rg[i];
         for (std::size_t j = 0; j < nt; ++j) {
             const double theta = dt * static_cast<double>(j);
-            const double r2 = rg[i] * rg[i];
-            const double r3 = r2 * rg[i];
             // val = 3*Z(0，0) + Z(2,0) - 1.5*Z(2,2) + 2*Z(5,-3)
-            val(i, j) = 2. * (1. + r2) - 1.5 * r2 * std::cos(2. * theta) +
+            val(i, j) = 3. + (2. * r2 - 1.) - 1.5 * r2 * std::cos(2. * theta) +
                         2. * r3 * (-4. + 5. * r2) * (std::sin(3. * theta));
         }
     }
 
-    Zernike::Series<double> zernike_series(5, nr, nt, val, rg);
+    constexpr int polar_order = 4;
+    Zernike::Series<double> zernike_series(polar_order, nr, nt, val, rg);
 
     std::cout << "\nCoefficients of f = 3*Z(0，0) + Z(2,0) - 1.5*Z(2,2) + "
                  "2*Z(5,-3)\n";
     int l = 0;
     for (auto c : zernike_series.coefficient()) {
         std::cout << std::setw(9) << std::setprecision(2) << c << ", ";
-        const auto n = Zernike::index_n(l);
-        const auto m = Zernike::index_m(l);
-        if (n == m) { std::cout << '\n'; }
+        const auto [n, m] = Zernike::basic_index_nm(l, zernike_series.order);
+        if (n == m || n + m == 2 * static_cast<int>(zernike_series.order)) {
+            std::cout << '\n';
+        }
         ++l;
     }
+
     return 0;
 }
