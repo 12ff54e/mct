@@ -493,6 +493,12 @@ auto integrate_coarse(const Func& func,
     return impl::gauss_kronrod_adaptive(func, a, b, max_subdivide, Tx{}, tol);
 }
 
+template <typename T>
+concept Indexed1D = requires(const T& arr, std::size_t i) { arr[i]; };
+
+template <typename T>
+concept Indexed2D = requires(const T& arr, std::size_t i) { arr(i, i); };
+
 }  // namespace util
 
 #endif

@@ -200,14 +200,15 @@ struct Series {
         }
     }
 
-    template <typename U, typename V>
+    template <util::Indexed2D U, util::Indexed1D V>
     Series(std::size_t polar_order,
            std::size_t radial_size,
            std::size_t polar_size,
-           const U& data,
+           U data,
            const V& radial_coord)
         : Series(polar_order) {
-        // force n to be multiplier of 4 can reduce cache size to n/4
+        // force polar_order to be multiplier of 4 can reduce cache size to
+        // polar_size/4
         const val_type theta_delta =
             2 * M_PI / static_cast<val_type>(polar_size);
         std::vector<std::array<double, 2>> sincos(polar_size);
@@ -217,64 +218,53 @@ struct Series {
             sincos[i][1] = std::cos(theta);
         }
 
-        // store integral of {sin,cos}(m * theta)*f(r,theta)
-        std::vector<val_type> circ_integral(order * 2 + 1);
+        for (std::size_t l = 0; l < coef.size(); ++l) {
+            const auto [n, m] = basic_index_nm(l, order);
 
-        std::vector<val_type> f0(coef.size());
-        std::vector<val_type> f1(coef.size());
-        std::vector<val_type> f2(coef.size());
-        val_type dr0 = 0;
-        val_type dr1 = 0;
-
-        const auto calc_integrand = [&](auto& vals, auto r) {
-            for (std::size_t l = 0; l < coef.size(); ++l) {
-                const auto [n, m] = basic_index_nm(l, order);
-                vals[l] = circ_integral[static_cast<std::size_t>(
-                              m + static_cast<int>(order))] *
-                          radial_at(n, util::abs(m), r) * r;
-            }
-        };
-        calc_integrand(f0, 0.);
-
-        val_type r0 = 0.;
-        for (std::size_t j = 0; j < radial_size; ++j) {
-            for (std::size_t i = 0; i < polar_size; ++i) {
-                for (std::size_t m = 0; m < circ_integral.size(); ++m) {
+            val_type r0 = 0.;
+            val_type dr0 = 0;
+            val_type dr1 = 0;
+            double f0 = 0.;
+            double f1 = 0.;
+            double f2 = 0.;
+            for (std::size_t j = 0; j < radial_size; ++j) {
+                val_type circ_integral_l{};
+                for (std::size_t i = 0; i < polar_size; ++i) {
                     const val_type simpson_coef =
                         ((i == 0 || i == polar_size - 1) && polar_size % 2 != 0
                              ? 5. / 6.
                              : static_cast<val_type>(2 * (1 + i % 2)) / 3.) *
                         theta_delta;
-                    circ_integral[m] +=
+                    circ_integral_l +=
                         simpson_coef *
-                        sincos[i * (m > order ? m - order : order - m) %
-                               polar_size][m < order ? 0 : 1] *
+                        sincos[i * util::abs(m) % polar_size][m < 0 ? 0 : 1] *
                         data(j, i);
                 }
+
+                const val_type r = radial_coord[j];
+                if (j % 2 == 0) {
+                    dr0 = r - r0;
+                    f1 = circ_integral_l * radial_at(n, util::abs(m), r) * r;
+                } else {
+                    dr1 = r - r0;
+                    f2 = circ_integral_l * radial_at(n, util::abs(m), r) * r;
+                    coef[l] += (dr0 + dr1) / 6. *
+                               (2. * (f0 + f1 + f2) + dr0 / dr1 * (f1 - f2) +
+                                dr1 / dr0 * (f1 - f0));
+                    f0 = f2;
+                }
+                r0 = r;
             }
 
-            const val_type r = radial_coord[j];
-            if (j % 2 == 0) {
-                dr0 = r - r0;
-                calc_integrand(f1, r);
-            } else {
-                dr1 = r - r0;
-                calc_integrand(f2, r);
-                for (std::size_t l = 0; l < coef.size(); ++l) {
-                    coef[l] += (dr0 + dr1) / 6. *
-                               (2. * (f0[l] + f1[l] + f2[l]) +
-                                dr0 / dr1 * (f1[l] - f2[l]) +
-                                dr1 / dr0 * (f1[l] - f0[l]));
-                    f0[l] = f2[l];
+            coef[l] *= (n + 1) * (m == 0 ? 1. : 2.) / M_PI;
+            for (std::size_t j = 0; j < radial_size; ++j) {
+                const val_type r = radial_coord[j];
+                for (std::size_t i = 0; i < polar_size; ++i) {
+                    data(j, i) -=
+                        coef[l] * radial_at(n, util::abs(m), r) *
+                        sincos[i * util::abs(m) % polar_size][m < 0 ? 0 : 1];
                 }
             }
-            for (auto& v : circ_integral) { v = 0.; }
-            r0 = r;
-        }
-
-        for (std::size_t l = 0; l < coef.size(); ++l) {
-            const auto [n, m] = basic_index_nm(l, order);
-            coef[l] *= (n + 1) * (m == 0 ? 1. : 2.) / M_PI;
         }
     }
 
