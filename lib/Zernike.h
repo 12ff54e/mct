@@ -202,10 +202,10 @@ struct Series {
     Series(int polar_order,
            std::size_t radial_size,
            std::size_t polar_size,
-           U data,
+           const U& data,
            const V& radial_coord)
         : Series(polar_order) {
-        // force polar_order to be multiplier of 4 can reduce cache size to
+        // force polar_size to be multiplier of 4 can reduce cache size to
         // polar_size/4
         const val_type theta_delta =
             2 * M_PI / static_cast<val_type>(polar_size);
@@ -223,8 +223,9 @@ struct Series {
         const auto calc_angular_integral = [&](auto n, auto m, auto ri,
                                                auto r) -> val_type {
             auto& val =
-                angular_integrals[ri * static_cast<std::size_t>(2 * order + 1) +
-                                  static_cast<std::size_t>(m + order)];
+                angular_integrals[radial_size *
+                                      static_cast<std::size_t>(m + order) +
+                                  ri];
             if (n == util::abs(m)) {
                 for (std::size_t i = 0; i < polar_size; ++i) {
                     const auto angular_val =
@@ -250,26 +251,23 @@ struct Series {
             const auto [n, m] = basic_index_nm(l, order);
 
             val_type r0 = 0.;
-            val_type dr0 = 0;
-            val_type dr1 = 0;
-            double f0 = 0.;
-            double f1 = 0.;
-            double f2 = 0.;
+            val_type f0 = 0.;
+
+            std::array<val_type, 2> dr;
+            std::array<val_type, 2> fr;
             for (std::size_t j = 0; j < radial_size; ++j) {
                 const val_type r = radial_coord[j];
                 const auto radial_val = radial_at(n, util::abs(m), r);
                 const auto angular_integral = calc_angular_integral(n, m, j, r);
 
-                if (j % 2 == 0) {
-                    dr0 = r - r0;
-                    f1 = angular_integral * radial_val * r;
-                } else {
-                    dr1 = r - r0;
-                    f2 = angular_integral * radial_val * r;
-                    coef[l] += (dr0 + dr1) / 6. *
-                               (2. * (f0 + f1 + f2) + dr0 / dr1 * (f1 - f2) +
-                                dr1 / dr0 * (f1 - f0));
-                    f0 = f2;
+                dr[j % 2] = r - r0;
+                fr[j % 2] = angular_integral * radial_val * r;
+                if (j % 2 != 0) {
+                    coef[l] += (dr[0] + dr[1]) / 6. *
+                               (2. * (f0 + fr[0] + fr[1]) +
+                                dr[0] / dr[1] * (fr[0] - fr[1]) +
+                                dr[1] / dr[0] * (fr[0] - f0));
+                    f0 = fr[1];
                 }
                 r0 = r;
             }
