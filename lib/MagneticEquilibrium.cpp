@@ -4,6 +4,7 @@
 
 #include "Contour.h"
 #include "MagneticEquilibrium.h"
+#include "Timer.h"
 
 #ifdef MCT_ZERNIKE_SERIES_
 #define MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
@@ -20,6 +21,8 @@ MagneticEquilibrium::generate_boozer_coordinate_(
             "[MagneticEquilibrium] Radial sample point must be even.");
     }
 
+    auto& timer = Timer::get_timer();
+    timer.start("Create Boozer grid");
     intp::InterpolationFunction<double, 2u, ORDER> flux_function(
         g_file_data.flux,
         std::make_pair(g_file_data.r_left,
@@ -259,6 +262,8 @@ MagneticEquilibrium::generate_boozer_coordinate_(
         // this value is always normalized to R0
         r_minor_n.push_back(r_geo_intp(0.) / R0 - 1.);
     }
+
+    timer.pause();
 
     // psi_delta_ is normalized after flux surface is fully constructed, and
     // should never be changed hereafter

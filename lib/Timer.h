@@ -31,7 +31,7 @@ class Timer {
                   std::chrono::high_resolution_clock::time_point>>
         time_consuming;
 
-    std::string current_func_name;
+    std::vector<std::string> current_func_names;
 };
 
 #ifdef ZQ_TIMER_IMPLEMENTATION
@@ -40,7 +40,7 @@ class Timer {
 #include <iostream>
 
 void Timer::start(std::string func_name) {
-    current_func_name = func_name;
+    current_func_names.push_back(func_name);
     auto emplace_reuslt = time_consuming.emplace(
         func_name,
         std::make_pair(std::chrono::high_resolution_clock::duration::zero(),
@@ -60,19 +60,29 @@ void Timer::pause_last_and_start_next(std::string func_name) {
 
 void Timer::pause() {
     auto end_time = std::chrono::high_resolution_clock::now();
-    auto elapsed_time = end_time - time_consuming.at(current_func_name).second;
-    time_consuming.at(current_func_name).first += elapsed_time;
+    auto elapsed_time =
+        end_time - time_consuming.at(current_func_names.back()).second;
+    time_consuming.at(current_func_names.back()).first += elapsed_time;
+    if (!current_func_names.empty()) { current_func_names.pop_back(); }
 }
 
 void Timer::pause(std::string func_name) {
     auto end_time = std::chrono::high_resolution_clock::now();
     auto elapsed_time = end_time - time_consuming.at(func_name).second;
     time_consuming.at(func_name).first += elapsed_time;
+    for (auto iter = current_func_names.begin();
+         iter != current_func_names.end(); ++iter) {
+        if (*iter == func_name) {
+            current_func_names.erase(iter);
+            break;
+        }
+    }
 }
 
 void Timer::reset() {
     entries.clear();
     time_consuming.clear();
+    current_func_names.clear();
 }
 
 void Timer::print() {
