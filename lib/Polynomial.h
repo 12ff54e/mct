@@ -1,13 +1,13 @@
-#ifndef POLYNOMIAL_H
-#define POLYNOMIAL_H
+#ifndef MCT_POLYNOMIAL_H
+#define MCT_POLYNOMIAL_H
 
 #include <algorithm>  //max
 #include <array>
+#include <cstdint>  // std::intmax_t
 #include <cstdlib>  //std::size_t
-#include <ratio>
 #include <type_traits>
 
-template <typename... Coefs>
+template <std::intmax_t... coefs>
 struct Polynomial;
 
 namespace impl {
@@ -45,28 +45,28 @@ constexpr T eval_impl_even(A arr, T pows, std::index_sequence<idx...>) {
 template <typename P, typename IS>
 struct poly_derivative_helper {};
 
-template <typename... Cs, std::intmax_t... ps>
-struct poly_derivative_helper<Polynomial<Cs...>,
+template <std::intmax_t... cs, std::intmax_t... ps>
+struct poly_derivative_helper<Polynomial<cs...>,
                               std::integer_sequence<std::intmax_t, ps...>> {
-    using type = Polynomial<std::ratio_multiply<Cs, std::ratio<ps + 1>>...>;
+    using type = Polynomial<cs*(ps + 1)...>;
 };
 
 template <typename P, std::size_t n>
 struct poly_derivative_impl {};
-template <typename C, typename... Cs>
-struct poly_derivative_impl<Polynomial<C, Cs...>, 0> {
-    using type = Polynomial<C, Cs...>;
+template <std::intmax_t c, std::intmax_t... cs>
+struct poly_derivative_impl<Polynomial<c, cs...>, 0> {
+    using type = Polynomial<c, cs...>;
 };
 template <std::size_t n>
 struct poly_derivative_impl<Polynomial<>, n> {
-    using type = Polynomial<std::ratio<0, 1>>;
+    using type = Polynomial<0>;
 };
-template <std::size_t n, typename C, typename... Cs>
-struct poly_derivative_impl<Polynomial<C, Cs...>, n> {
+template <std::size_t n, std::intmax_t c, std::intmax_t... cs>
+struct poly_derivative_impl<Polynomial<c, cs...>, n> {
     using type = typename poly_derivative_impl<
         typename poly_derivative_helper<
-            Polynomial<Cs...>,
-            std::make_integer_sequence<std::intmax_t, sizeof...(Cs)>>::type,
+            Polynomial<cs...>,
+            std::make_integer_sequence<std::intmax_t, sizeof...(cs)>>::type,
         n - 1>::type;
 };
 };  // namespace impl
@@ -74,18 +74,16 @@ struct poly_derivative_impl<Polynomial<C, Cs...>, n> {
 template <typename P, std::size_t n>
 using poly_derivative = typename impl::poly_derivative_impl<P, n>::type;
 
-template <typename... Coefs>
+template <std::intmax_t... coefs>
 struct Polynomial {
-    using Self = Polynomial<Coefs...>;
-    static constexpr std::size_t order = sizeof...(Coefs);
+    using Self = Polynomial<coefs...>;
+    static constexpr std::size_t order = sizeof...(coefs);
 
     template <typename T>
     static constexpr T eval(T x) {
-        return ([x]<typename... Cs>(Polynomial<Cs...>) {
-            return impl::eval_impl(
-                std::array<T, order>{
-                    (static_cast<T>(Cs::num) / static_cast<T>(Cs::den))...},
-                x);
+        return ([x]<std::intmax_t... cs>(Polynomial<cs...>) {
+            return impl::eval_impl(std::array<T, order>{static_cast<T>(cs)...},
+                                   x);
         })(Self{});
     }
 
@@ -96,13 +94,8 @@ struct Polynomial {
 
     template <typename OS>
     static void print_to(OS& out) {
-        ([&out]<typename... Cs>(Polynomial<Cs...>) {
-            const auto print_ratio = [&out]<typename C>(C) {
-                out << C::num;
-                if (C::den != 1) { out << '/' << C::den; }
-                out << ',';
-            };
-            (..., print_ratio(Cs{}));
+        ([&out]<std::intmax_t... cs>(Polynomial<cs...>) {
+            (..., (out << cs << ','));
         })(Self{});
     }
 };
@@ -116,84 +109,83 @@ template <typename P1>
 struct join<P1, Polynomial<>> {
     using type = P1;
 };
-template <typename C2, typename... C1s, typename... C2s>
-struct join<Polynomial<C1s...>, Polynomial<C2, C2s...>> {
+template <std::intmax_t c2, std::intmax_t... c1s, std::intmax_t... c2s>
+struct join<Polynomial<c1s...>, Polynomial<c2, c2s...>> {
     using type =
-        typename join<Polynomial<C1s..., C2>, Polynomial<C2s...>>::type;
+        typename join<Polynomial<c1s..., c2>, Polynomial<c2s...>>::type;
 };
 
-template <typename T, std::size_t n, typename... Ts>
-struct constant_list_impl : constant_list_impl<T, n - 1, T, Ts...> {};
+template <std::intmax_t c, std::size_t n, std::intmax_t... cs>
+struct constant_list_impl : constant_list_impl<c, n - 1, c, cs...> {};
 
-template <typename T, typename... Ts>
-struct constant_list_impl<T, 0, Ts...> {
-    using type = Polynomial<Ts...>;
+template <std::intmax_t c, std::intmax_t... cs>
+struct constant_list_impl<c, 0, cs...> {
+    using type = Polynomial<cs...>;
 };
 
-template <typename T, std::size_t n>
+template <std::intmax_t c, std::size_t n>
 struct constant_list {
-    using type = typename constant_list_impl<T, n>::type;
+    using type = typename constant_list_impl<c, n>::type;
 };
 
 template <typename P, std::size_t n>
 struct pad {};
 
-template <typename C, typename... Cs, std::size_t n>
-struct pad<Polynomial<C, Cs...>, n> {
+template <std::intmax_t c, std::intmax_t... cs, std::size_t n>
+struct pad<Polynomial<c, cs...>, n> {
     using type =
-        typename join<Polynomial<C>,
-                      typename pad<Polynomial<Cs...>, n - 1>::type>::type;
+        typename join<Polynomial<c>,
+                      typename pad<Polynomial<cs...>, n - 1>::type>::type;
 };
 template <std::size_t n>
 struct pad<Polynomial<>, n> {
-    using type = typename constant_list<std::ratio<0>, n>::type;
+    using type = typename constant_list<0, n>::type;
 };
 
 template <typename P1, typename P2>
 struct poly_add_impl {};
 
-template <typename... C1s, typename... C2s>
-struct poly_add_impl<Polynomial<C1s...>, Polynomial<C2s...>> {
-    using type = Polynomial<std::ratio_add<C1s, C2s>...>;
+template <std::intmax_t... c1s, std::intmax_t... c2s>
+struct poly_add_impl<Polynomial<c1s...>, Polynomial<c2s...>> {
+    using type = Polynomial<(c1s + c2s)...>;
 };
 
 template <typename P1, typename P2>
 struct poly_sub_impl {};
 
-template <typename... C1s, typename... C2s>
-struct poly_sub_impl<Polynomial<C1s...>, Polynomial<C2s...>> {
-    using type = Polynomial<std::ratio_subtract<C1s, C2s>...>;
+template <std::intmax_t... c1s, std::intmax_t... c2s>
+struct poly_sub_impl<Polynomial<c1s...>, Polynomial<c2s...>> {
+    using type = Polynomial<(c1s - c2s)...>;
 };
 
-template <typename P, typename T>
+template <typename P, std::intmax_t c>
 struct poly_scale_impl {};
 
-template <typename T, typename... Cs>
-struct poly_scale_impl<Polynomial<Cs...>, T> {
-    using type = Polynomial<std::ratio_multiply<Cs, T>...>;
+template <std::intmax_t c, std::intmax_t... cs>
+struct poly_scale_impl<Polynomial<cs...>, c> {
+    using type = Polynomial<(cs * c)...>;
 };
 
-template <typename C, typename P>
+template <std::intmax_t c, typename P>
 struct poly_prepend {};
 
-template <typename C, typename... Cs>
-struct poly_prepend<C, Polynomial<Cs...>> {
-    using type = Polynomial<C, Cs...>;
+template <std::intmax_t c, std::intmax_t... cs>
+struct poly_prepend<c, Polynomial<cs...>> {
+    using type = Polynomial<c, cs...>;
 };
 
 template <typename P>
 struct poly_trim_helper {};
 
-template <typename C, typename... Cs>
-struct poly_trim_helper<Polynomial<C, Cs...>> {
-    using tail_trim_result = poly_trim_helper<Polynomial<Cs...>>;
+template <std::intmax_t c, std::intmax_t... cs>
+struct poly_trim_helper<Polynomial<c, cs...>> {
+    using tail_trim_result = poly_trim_helper<Polynomial<cs...>>;
 
-    static constexpr bool trimming =
-        tail_trim_result::trimming && std::is_same_v<C, std::ratio<0>>;
+    static constexpr bool trimming = tail_trim_result::trimming && c == 0;
     using type = std::conditional_t<
         trimming,
         Polynomial<>,
-        typename poly_prepend<C, typename tail_trim_result::type>::type>;
+        typename poly_prepend<c, typename tail_trim_result::type>::type>;
 };
 
 template <>
@@ -206,7 +198,7 @@ template <typename P>
 struct poly_trim {
     using helper_result = typename poly_trim_helper<P>::type;
     using type = std::conditional_t<std::is_same_v<helper_result, Polynomial<>>,
-                                    Polynomial<std::ratio<0>>,
+                                    Polynomial<0>,
                                     helper_result>;
 };
 
@@ -222,15 +214,14 @@ using poly_sub = typename impl::poly_trim<typename impl::poly_sub_impl<
     typename impl::pad<P1, std::max(P1::order, P2::order)>::type,
     typename impl::pad<P2, std::max(P1::order, P2::order)>::type>::type>::type;
 
-template <typename P, typename T>
-using poly_scale = typename impl::poly_scale_impl<P, T>::type;
+template <typename P, std::intmax_t c>
+using poly_scale = typename impl::poly_scale_impl<P, c>::type;
 
 namespace impl {
 
 template <typename P, std::size_t n>
 struct right_shift {
-    using type =
-        typename join<typename constant_list<std::ratio<0>, n>::type, P>::type;
+    using type = typename join<typename constant_list<0, n>::type, P>::type;
 };
 
 template <typename P1, typename P2>
@@ -240,12 +231,12 @@ template <typename P2>
 struct poly_mul_impl<Polynomial<>, P2> {
     using type = Polynomial<>;
 };
-template <typename C1, typename... C1s, typename P2>
-struct poly_mul_impl<Polynomial<C1, C1s...>, P2> {
+template <std::intmax_t c1, std::intmax_t... c1s, typename P2>
+struct poly_mul_impl<Polynomial<c1, c1s...>, P2> {
     using type =
-        poly_add<poly_scale<P2, C1>,
+        poly_add<poly_scale<P2, c1>,
                  typename right_shift<
-                     typename poly_mul_impl<Polynomial<C1s...>, P2>::type,
+                     typename poly_mul_impl<Polynomial<c1s...>, P2>::type,
                      1>::type>;
 };
 
@@ -253,15 +244,16 @@ template <typename P>
 struct poly_leading {};
 template <>
 struct poly_leading<Polynomial<>> {
-    using type = std::ratio<0>;
+    static constexpr std::intmax_t value = 0;
 };
-template <typename C>
-struct poly_leading<Polynomial<C>> {
-    using type = C;
+template <std::intmax_t c>
+struct poly_leading<Polynomial<c>> {
+    static constexpr std::intmax_t value = c;
 };
-template <typename C, typename... Cs>
-struct poly_leading<Polynomial<C, Cs...>> {
-    using type = typename poly_leading<Polynomial<Cs...>>::type;
+template <std::intmax_t c, std::intmax_t... cs>
+struct poly_leading<Polynomial<c, cs...>> {
+    static constexpr std::intmax_t value =
+        poly_leading<Polynomial<cs...>>::value;
 };
 
 template <typename P>
@@ -270,40 +262,15 @@ template <>
 struct poly_tail<Polynomial<>> {
     using type = Polynomial<>;
 };
-template <typename C>
-struct poly_tail<Polynomial<C>> {
+template <std::intmax_t c>
+struct poly_tail<Polynomial<c>> {
     using type = Polynomial<>;
 };
-template <typename C, typename... Cs>
-struct poly_tail<Polynomial<C, Cs...>> {
+template <std::intmax_t c, std::intmax_t... cs>
+struct poly_tail<Polynomial<c, cs...>> {
     using type =
-        typename poly_prepend<C, typename poly_tail<Polynomial<Cs...>>::type>::
+        typename poly_prepend<c, typename poly_tail<Polynomial<cs...>>::type>::
             type;
-};
-
-template <typename P1, typename P2>
-struct poly_div_helper {
-    using type = typename right_shift<
-        Polynomial<std::ratio_divide<typename poly_leading<P1>::type,
-                                     typename poly_leading<P2>::type>>,
-        P1::order - P2::order>::type;
-};
-
-template <typename P1, typename P2>
-struct poly_div_impl {
-    using q = typename poly_div_helper<P1, P2>::type;
-    using tail_result =
-        poly_div_impl<poly_sub<P1, typename poly_mul_impl<q, P2>::type>, P2>;
-
-    using quotient = poly_add<q, typename tail_result::quotient>;
-    using remainder = typename tail_result::remainder;
-};
-template <typename P1, typename P2>
-    requires(P1::order < P2::order ||
-             std::is_same_v<P1, Polynomial<std::ratio<0>>>)
-struct poly_div_impl<P1, P2> {
-    using quotient = Polynomial<std::ratio<0>>;
-    using remainder = P1;
 };
 
 };  // namespace impl
@@ -311,13 +278,4 @@ struct poly_div_impl<P1, P2> {
 template <typename P1, typename P2>
 using poly_mul = typename impl::poly_mul_impl<P1, P2>::type;
 
-template <typename P1, typename P2>
-using poly_div = typename impl::poly_div_impl<P1, P2>::quotient;
-
-template <typename P1, typename P2>
-using poly_mod = typename impl::poly_div_impl<P1, P2>::remainder;
-
-template <typename P1, typename P2>
-using poly_divmod = impl::poly_div_impl<P1, P2>;
-
-#endif  // POLYNOMIAL_H
+#endif  // MCT_POLYNOMIAL_H

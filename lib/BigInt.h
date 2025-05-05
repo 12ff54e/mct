@@ -25,24 +25,27 @@ struct bigint_less_helper
           std::conjunction<
               std::integral_constant<bool, (P1::order == P2::order)>,
               std::disjunction<
-                  std::ratio_less<typename poly_leading<P1>::type,
-                                  typename poly_leading<P2>::type>,
+                  std::integral_constant<bool,
+                                         (poly_leading<P1>::value <
+                                          poly_leading<P2>::value)>,
                   std::conjunction<
-                      std::ratio_equal<typename poly_leading<P1>::type,
-                                       typename poly_leading<P2>::type>,
+                      std::integral_constant<bool,
+                                             (poly_leading<P1>::value ==
+                                              poly_leading<P2>::value)>,
                       bigint_less<typename poly_tail<P1>::type,
                                   typename poly_tail<P2>::type>>>>> {};
 
 template <typename P1, typename P2>
 struct bigint_less : bigint_less_helper<P1, P2> {};
-template <typename C1, typename C2>
-struct bigint_less<Polynomial<C1>, Polynomial<C2>> : std::ratio_less<C1, C2> {};
-template <typename C>
-struct bigint_less<Polynomial<C>, Polynomial<>>
-    : std::ratio_less<C, std::ratio<0>> {};
-template <typename C>
-struct bigint_less<Polynomial<>, Polynomial<C>>
-    : std::ratio_less<std::ratio<0>, C> {};
+template <std::intmax_t c1, std::intmax_t c2>
+struct bigint_less<Polynomial<c1>, Polynomial<c2>>
+    : std::integral_constant<bool, (c1 < c2)> {};
+template <std::intmax_t c>
+struct bigint_less<Polynomial<c>, Polynomial<>>
+    : std::integral_constant<bool, (c < 0)> {};
+template <std::intmax_t c>
+struct bigint_less<Polynomial<>, Polynomial<c>>
+    : std::integral_constant<bool, (0 < c)> {};
 
 template <typename, typename>
 struct bigint_equal;
@@ -50,22 +53,23 @@ struct bigint_equal;
 template <typename P1, typename P2>
 struct bigint_equal_helper
     : std::conjunction<std::integral_constant<bool, (P1::order == P2::order)>,
-                       std::ratio_equal<typename poly_leading<P1>::type,
-                                        typename poly_leading<P2>::type>,
+                       std::integral_constant<bool,
+                                              (poly_leading<P1>::value ==
+                                               poly_leading<P2>::value)>,
                        bigint_equal<typename poly_tail<P1>::type,
                                     typename poly_tail<P2>::type>> {};
 
 template <typename P1, typename P2>
 struct bigint_equal : bigint_equal_helper<P1, P2> {};
-template <typename C1, typename C2>
-struct bigint_equal<Polynomial<C1>, Polynomial<C2>> : std::ratio_equal<C1, C2> {
-};
-template <typename C>
-struct bigint_equal<Polynomial<C>, Polynomial<>>
-    : std::ratio_equal<C, std::ratio<0>> {};
-template <typename C>
-struct bigint_equal<Polynomial<>, Polynomial<C>>
-    : std::ratio_equal<std::ratio<0>, C> {};
+template <std::intmax_t c1, std::intmax_t c2>
+struct bigint_equal<Polynomial<c1>, Polynomial<c2>>
+    : std::integral_constant<bool, (c1 == c2)> {};
+template <std::intmax_t c>
+struct bigint_equal<Polynomial<c>, Polynomial<>>
+    : std::integral_constant<bool, (c == 0)> {};
+template <std::intmax_t c>
+struct bigint_equal<Polynomial<>, Polynomial<c>>
+    : std::integral_constant<bool, (c == 0)> {};
 
 };  // namespace impl
 
@@ -89,77 +93,67 @@ template <typename B1, typename B2>
 constexpr bool bigint_less_equal_v = bigint_less_equal<B1, B2>::value;
 
 namespace impl {
-template <typename C, typename P, bool to_positive = true>
+template <std::intmax_t c, typename P, bool to_positive = true>
 struct normalize_bigint {};
-template <bool to_positive, typename C0, typename C1, typename... Cs>
-struct normalize_bigint<C0, Polynomial<C1, Cs...>, to_positive> {
-    static constexpr std::intmax_t r = ((C0::num + C1::num) % bigint_base +
-                                        (to_positive ? 1 : -1) * bigint_base) %
-                                       bigint_base;
-    using type = typename poly_prepend<
-        std::ratio<r>,
-        typename normalize_bigint<
-            std::ratio<(C0::num + C1::num - r) / bigint_base>,
-            Polynomial<Cs...>,
-            to_positive>::type>::type;
-};
-template <bool to_positive, typename C>
-struct normalize_bigint<C, Polynomial<>, to_positive> {
+template <bool to_positive,
+          std::intmax_t c0,
+          std::intmax_t c1,
+          std::intmax_t... cs>
+struct normalize_bigint<c0, Polynomial<c1, cs...>, to_positive> {
     static constexpr std::intmax_t r =
-        (C::num % bigint_base + (to_positive ? 1 : -1) * bigint_base) %
+        ((c0 + c1) % bigint_base + (to_positive ? 1 : -1) * bigint_base) %
         bigint_base;
-    using type =
-        Polynomial<std::ratio<r>, std::ratio<(C::num - r) / bigint_base>>;
+    using type = typename poly_prepend<
+        r,
+        typename normalize_bigint<(c0 + c1 - r) / bigint_base,
+                                  Polynomial<cs...>,
+                                  to_positive>::type>::type;
+};
+template <bool to_positive, std::intmax_t c>
+struct normalize_bigint<c, Polynomial<>, to_positive> {
+    static constexpr std::intmax_t r =
+        (c % bigint_base + (to_positive ? 1 : -1) * bigint_base) % bigint_base;
+    using type = Polynomial<r, (c - r) / bigint_base>;
 };
 
 template <typename P1, typename P2>
 struct bigint_mul_impl {
-    using type =
-        typename normalize_bigint<std::ratio<0>, poly_mul<P1, P2>>::type;
-};
-
-template <typename C>
-struct mixed_fraction_parts {
-    static constexpr std::intmax_t integer_part = C::num / C::den;
-    using fractional_part = std::ratio_subtract<C, std::ratio<integer_part>>;
+    using type = typename normalize_bigint<0, poly_mul<P1, P2>>::type;
 };
 
 template <typename P1, typename P2>
 struct bigint_add_impl {
-    using type =
-        typename normalize_bigint<std::ratio<0>, poly_add<P1, P2>>::type;
+    using type = typename normalize_bigint<0, poly_add<P1, P2>>::type;
 };
 
 template <typename P1, typename P2>
 struct bigint_sub_impl {
     using type =
-        typename normalize_bigint<std::ratio<0>,
+        typename normalize_bigint<0,
                                   poly_sub<P1, P2>,
                                   bigint_less<P2, P1>::type::value>::type;
 };
 
 template <typename P>
 struct collapse_leading_term {};
-template <typename C, typename... Cs>
-struct collapse_leading_term<Polynomial<C, Cs...>> {
-    using tail_result = collapse_leading_term<Polynomial<Cs...>>;
-    using carry = std::ratio<0>;
+template <std::intmax_t c, std::intmax_t... cs>
+struct collapse_leading_term<Polynomial<c, cs...>> {
+    using tail_result = collapse_leading_term<Polynomial<cs...>>;
+    static constexpr std::intmax_t carry = 0;
 
-    using type =
-        typename poly_prepend<std::ratio_add<C, typename tail_result::carry>,
-                              typename tail_result::type>::type;
+    using type = typename poly_prepend<(c + tail_result::carry),
+                                       typename tail_result::type>::type;
 };
-template <typename C>
-struct collapse_leading_term<Polynomial<C>> {
+template <std::intmax_t c>
+struct collapse_leading_term<Polynomial<c>> {
     using type = Polynomial<>;
-    using carry = std::ratio_multiply<C, std::ratio<bigint_base>>;
+    static constexpr std::intmax_t carry = c * bigint_base;
 };
 
 template <typename P1, typename P2>
 struct bigint_div_helper {
     using type = typename right_shift<
-        Polynomial<std::ratio<poly_leading<P1>::type::num /
-                              (poly_leading<P2>::type::num + 1)>>,
+        Polynomial<(poly_leading<P1>::value / (poly_leading<P2>::value + 1))>,
         P1::order - P2::order>::type;
 };
 
@@ -177,17 +171,16 @@ struct if_else<false> {
 
 template <typename P1, typename P2>
 struct bigint_div_impl {
-    using q = typename if_else<
-        std::ratio_greater_v<typename poly_leading<P1>::type,
-                             typename poly_leading<P2>::type>>::
-        template type<
-            bigint_div_helper<P1, P2>,
-            bigint_div_helper<typename collapse_leading_term<P1>::type,
-                              P2>>::type;
+    using q =
+        typename if_else<(poly_leading<P1>::value > poly_leading<P2>::value)>::
+            template type<
+                bigint_div_helper<P1, P2>,
+                bigint_div_helper<typename collapse_leading_term<P1>::type,
+                                  P2>>::type;
 
     using sub_type = bigint_div_impl<
         typename poly_trim<typename normalize_bigint<
-            std::ratio<0>,
+            0,
             typename bigint_sub_impl<
                 P1,
                 typename bigint_mul_impl<q, P2>::type>::type>::type>::type,
@@ -202,52 +195,50 @@ template <typename P1, typename P2>
     requires(bigint_less_equal_v<BigInt<P1>, BigInt<P2>>)
 struct bigint_div_impl<P1, P2> {
     using quotient = std::conditional_t<bigint_equal_v<BigInt<P1>, BigInt<P2>>,
-                                        Polynomial<std::ratio<1>>,
-                                        Polynomial<std::ratio<0>>>;
+                                        Polynomial<1>,
+                                        Polynomial<0>>;
     using remainder = std::conditional_t<bigint_equal_v<BigInt<P1>, BigInt<P2>>,
-                                         Polynomial<std::ratio<0>>,
+                                         Polynomial<0>,
                                          P1>;
 };
 
 template <std::intmax_t I>
 struct to_bigint_impl {
     using type = typename poly_prepend<
-        std::ratio<I % bigint_base>,
+        I % bigint_base,
         typename to_bigint_impl<I / bigint_base>::type>::type;
 };
 template <>
 struct to_bigint_impl<0> {
-    using type = Polynomial<std::ratio<0>>;
+    using type = Polynomial<0>;
 };
 
 template <typename>
 struct from_bigint_impl;
-template <typename C, typename... Cs>
-struct from_bigint_impl<Polynomial<C, Cs...>> {
+template <std::intmax_t c, std::intmax_t... cs>
+struct from_bigint_impl<Polynomial<c, cs...>> {
     using type = std::integral_constant<
         std::intmax_t,
-        C::num +
-            bigint_base * from_bigint_impl<Polynomial<Cs...>>::type::value>;
+        c + bigint_base * from_bigint_impl<Polynomial<cs...>>::type::value>;
 };
 template <>
 struct from_bigint_impl<Polynomial<>> {
     using type = std::integral_constant<std::intmax_t, 0>;
 };
 
-template <typename C, typename P>
+template <std::intmax_t c, typename P>
 struct bigint_predecessor_helper {};
-template <typename C0, typename C1, typename... Cs>
-struct bigint_predecessor_helper<C0, Polynomial<C1, Cs...>> {
-    using s = std::ratio_add<C1, C0>;
+template <std::intmax_t c0, std::intmax_t c1, std::intmax_t... cs>
+struct bigint_predecessor_helper<c0, Polynomial<c1, cs...>> {
+    static constexpr std::intmax_t s = c0 + c1;
     using type = typename poly_prepend<
-        std::ratio<(mixed_fraction_parts<s>::integer_part + bigint_base) %
-                   bigint_base>,
-        typename bigint_predecessor_helper<std::ratio<(s::num < 0 ? -1 : 0)>,
-                                           Polynomial<Cs...>>::type>::type;
+        (s + bigint_base) % bigint_base,
+        typename bigint_predecessor_helper<(s < 0 ? -1 : 0),
+                                           Polynomial<cs...>>::type>::type;
 };
-template <typename C>
-struct bigint_predecessor_helper<C, Polynomial<>> {
-    using type = Polynomial<C>;
+template <std::intmax_t c>
+struct bigint_predecessor_helper<c, Polynomial<>> {
+    using type = Polynomial<c>;
 };
 
 template <typename P1, typename P2>
@@ -256,13 +247,12 @@ struct bigint_factorial_impl {
         P1,
         typename bigint_factorial_impl<
             typename poly_trim<
-                typename bigint_predecessor_helper<std::ratio<-1>,
-                                                   P1>::type>::type,
+                typename bigint_predecessor_helper<-1, P1>::type>::type,
             P2>::type>::type;
 };
 template <typename P>
 struct bigint_factorial_impl<P, P> {
-    using type = Polynomial<std::ratio<1>>;
+    using type = Polynomial<1>;
 };
 
 };  // namespace impl

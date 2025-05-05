@@ -65,7 +65,7 @@ struct RadialPolynomial {
     template <int... l>
     static auto poly_even(std::integer_sequence<int, l...>) {
         return typename impl::right_shift<
-            Polynomial<std::ratio<
+            Polynomial<
                 (n - m - l) % 2 != 0
                     ? 0
                     : ((n - m - l) % 4 == 0 ? 1 : -1) *
@@ -75,7 +75,7 @@ struct RadialPolynomial {
                                   to_bigint<(n - m - l) / 2>>,
                               bigint_mul<
                                   bigint_factorial<to_bigint<(l / 2 + m)>>,
-                                  bigint_factorial<to_bigint<(l / 2)>>>>>>...>,
+                                  bigint_factorial<to_bigint<(l / 2)>>>>>...>,
             m>::type{};
     }
 
@@ -84,7 +84,7 @@ struct RadialPolynomial {
         std::conditional_t<(n - m) % 2 == 0,
                            decltype(poly_even(
                                std::make_integer_sequence<int, n - m + 1>{})),
-                           Polynomial<std::ratio<0>>>;
+                           Polynomial<0>>;
 };
 
 constexpr int radial_index_l(int n, int m) {

@@ -8,11 +8,8 @@
 #define MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
 #include "../lib/Zernike.h"
 
-using z_r = std::ratio<0>;
-using zernike_radial_5_3 =
-    Polynomial<z_r, z_r, z_r, std::ratio<-4>, z_r, std::ratio<5>>;
-using zernike_radial_5_3_d =
-    Polynomial<z_r, z_r, std::ratio<-12>, z_r, std::ratio<25>>;
+using zernike_radial_5_3 = Polynomial<0, 0, 0, -4, 0, 5>;
+using zernike_radial_5_3_d = Polynomial<0, 0, -12, 0, 25>;
 
 int main() {
     double diff{};

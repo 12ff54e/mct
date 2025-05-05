@@ -5,8 +5,10 @@
 #include "Contour.h"
 #include "MagneticEquilibrium.h"
 
+#ifdef MCT_ZERNIKE_SERIES_
 #define MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
 #include "Zernike.h"
+#endif
 
 MagneticEquilibrium::MagneticEquilibriumRaw_
 MagneticEquilibrium::generate_boozer_coordinate_(
