@@ -35,7 +35,7 @@ constexpr std::pair<int, int> index_nm(auto l) {
 }
 
 constexpr std::size_t basic_cap(auto mt) {
-    return mt * (mt + 2);
+    return static_cast<std::size_t>(mt * (mt + 2));
 }
 constexpr std::size_t basic_index_l(auto n, auto m, auto mt) {
     return static_cast<std::size_t>(
@@ -51,12 +51,10 @@ constexpr int basic_index_m(auto l, auto mt) {
     return 2 * l < t ? index_m(l) : -index_m(t - l);
 }
 constexpr std::pair<int, int> basic_index_nm(auto l, auto mt) {
-    const auto t = basic_cap(mt);
-    return 2 * static_cast<std::size_t>(l) < t
-               ? index_nm(l)
-               : (([mt](auto p) -> decltype(p) {
-                     return {2 * mt - p.first, -p.second};
-                 })(index_nm(t - l)));
+    const auto t = static_cast<decltype(l)>(basic_cap(mt));
+    return 2 * l < t ? index_nm(l) : (([mt](auto p) -> decltype(p) {
+        return {2 * static_cast<int>(mt) - p.first, -p.second};
+    })(index_nm(t - l)));
 }
 
 namespace {
@@ -175,12 +173,12 @@ template <typename T>
 struct Series {
     using val_type = T;
 
-    const std::size_t order;  // maximum polar order
+    const int order;  // maximum polar order
     //  Maximum radial order = 2 * order
 
-    Series(std::size_t polar_order = MCT_MAX_ZERNIKE_POLAR_ORDER)
+    Series(int polar_order = MCT_MAX_ZERNIKE_POLAR_ORDER)
         : order(polar_order), coef(basic_cap(polar_order) + 1) {}
-    Series(std::size_t polar_order, std::vector<val_type> coefficients)
+    Series(int polar_order, std::vector<val_type> coefficients)
         : order(polar_order), coef{std::move(coefficients)} {
         const auto count = basic_cap(order) + 1;
         if (count != coef.size()) {
@@ -201,7 +199,7 @@ struct Series {
     }
 
     template <util::Indexed2D U, util::Indexed1D V>
-    Series(std::size_t polar_order,
+    Series(int polar_order,
            std::size_t radial_size,
            std::size_t polar_size,
            U data,
@@ -211,12 +209,42 @@ struct Series {
         // polar_size/4
         const val_type theta_delta =
             2 * M_PI / static_cast<val_type>(polar_size);
-        std::vector<std::array<double, 2>> sincos(polar_size);
+        std::vector<std::array<val_type, 2>> sincos(polar_size);
         for (std::size_t i = 0; i < polar_size; ++i) {
             const auto theta = static_cast<val_type>(i) * theta_delta;
             sincos[i][0] = std::sin(theta);
             sincos[i][1] = std::cos(theta);
         }
+
+        // stores \int_0^{2\pi}d\theta f(r,\theta)*trig(m*\theta), for each m
+        // and r
+        std::vector<val_type> angular_integrals(
+            radial_size * static_cast<std::size_t>(2 * order + 1));
+        const auto calc_angular_integral = [&](auto n, auto m, auto ri,
+                                               auto r) -> val_type {
+            auto& val =
+                angular_integrals[ri * static_cast<std::size_t>(2 * order + 1) +
+                                  static_cast<std::size_t>(m + order)];
+            if (n == util::abs(m)) {
+                for (std::size_t i = 0; i < polar_size; ++i) {
+                    const auto angular_val =
+                        data(ri, i) *
+                        sincos[i * static_cast<std::size_t>(util::abs(m)) %
+                               polar_size][m < 0 ? 0 : 1];
+                    const val_type simpson_coef =
+                        ((i == 0 || i == polar_size - 1) && polar_size % 2 != 0
+                             ? 5. / 6.
+                             : static_cast<val_type>(2 * (1 + i % 2)) / 3.) *
+                        theta_delta;
+                    val += simpson_coef * angular_val;
+                }
+            } else {
+                val -= coef[basic_index_l(n - 2, m, order)] *
+                       radial_at(n - 2, util::abs(m), r) * M_PI *
+                       (m == 0 ? 2. : 1.);
+            }
+            return val;
+        };
 
         for (std::size_t l = 0; l < coef.size(); ++l) {
             const auto [n, m] = basic_index_nm(l, order);
@@ -228,26 +256,16 @@ struct Series {
             double f1 = 0.;
             double f2 = 0.;
             for (std::size_t j = 0; j < radial_size; ++j) {
-                val_type circ_integral_l{};
-                for (std::size_t i = 0; i < polar_size; ++i) {
-                    const val_type simpson_coef =
-                        ((i == 0 || i == polar_size - 1) && polar_size % 2 != 0
-                             ? 5. / 6.
-                             : static_cast<val_type>(2 * (1 + i % 2)) / 3.) *
-                        theta_delta;
-                    circ_integral_l +=
-                        simpson_coef *
-                        sincos[i * util::abs(m) % polar_size][m < 0 ? 0 : 1] *
-                        data(j, i);
-                }
-
                 const val_type r = radial_coord[j];
+                const auto radial_val = radial_at(n, util::abs(m), r);
+                const auto angular_integral = calc_angular_integral(n, m, j, r);
+
                 if (j % 2 == 0) {
                     dr0 = r - r0;
-                    f1 = circ_integral_l * radial_at(n, util::abs(m), r) * r;
+                    f1 = angular_integral * radial_val * r;
                 } else {
                     dr1 = r - r0;
-                    f2 = circ_integral_l * radial_at(n, util::abs(m), r) * r;
+                    f2 = angular_integral * radial_val * r;
                     coef[l] += (dr0 + dr1) / 6. *
                                (2. * (f0 + f1 + f2) + dr0 / dr1 * (f1 - f2) +
                                 dr1 / dr0 * (f1 - f0));
@@ -257,14 +275,6 @@ struct Series {
             }
 
             coef[l] *= (n + 1) * (m == 0 ? 1. : 2.) / M_PI;
-            for (std::size_t j = 0; j < radial_size; ++j) {
-                const val_type r = radial_coord[j];
-                for (std::size_t i = 0; i < polar_size; ++i) {
-                    data(j, i) -=
-                        coef[l] * radial_at(n, util::abs(m), r) *
-                        sincos[i * util::abs(m) % polar_size][m < 0 ? 0 : 1];
-                }
-            }
         }
     }
 
