@@ -140,7 +140,6 @@ constexpr std::pair<int, int> basic_radial_index_nm(
 
 struct WrapperBase {
     virtual double eval(double) const = 0;
-    virtual double drvt(std::size_t, double) const = 0;
     virtual ~WrapperBase() {}
 };
 
@@ -149,25 +148,11 @@ struct Wrapper : public WrapperBase {
     double eval(double r) const override {
         return RadialPolynomial<n, m>::polynomial::eval(r);
     }
-    double drvt(std::size_t d, double r) const override {
-#ifdef MCT_DEBUG_
-        if (d > 2) {
-            throw std::runtime_error(
-                "[Zernike::Wrapper] Derivative order can not exceed 2.");
-        }
-#endif
-        return d == 0 ? eval(r)
-               : d == 1
-                   ? RadialPolynomial<n, m>::polynomial::template derivative<1>(
-                         r)
-                   : RadialPolynomial<n, m>::polynomial::template derivative<2>(
-                         r);
-    }
 };
 
 }  // namespace
 
-double radial_at(int n, int m, double r, std::size_t d = 0);
+double radial_at(int n, int m, double r);
 
 template <typename T>
 struct Series {
@@ -278,31 +263,16 @@ struct Series {
 
     val_type operator()(val_type r, val_type theta) const {
         val_type f{};
-        for (std::size_t l = 0; l < coef.size(); ++l) {
-            const auto [n, m] = basic_index_nm(l, order);
-            f += coef[l] * radial_at(n, m, r) *
-                 (m == 0  ? 1.
-                  : m < 0 ? std::sin(-m * theta)
-                          : std::cos(m * theta));
+        std::array<val_type, 2 * MCT_MAX_ZERNIKE_POLAR_ORDER + 1> trig_buffer;
+        for (int i = 0; i <= 2 * order; ++i) {
+            trig_buffer[static_cast<std::size_t>(i)] =
+                i < order ? std::sin((order - i) * theta)
+                          : std::cos((i - order) * theta);
         }
-        return f;
-    }
-
-    val_type derivative(std::array<val_type, 2> pt,
-                        std::array<std::size_t, 2> derivative_order) const {
-        const auto [r, theta] = pt;
-        const auto [rd, td] = derivative_order;
-
-        val_type f{};
         for (std::size_t l = 0; l < coef.size(); ++l) {
             const auto [n, m] = basic_index_nm(l, order);
-            const val_type t =
-                util::abs(m) * theta + .5 * static_cast<val_type>(td) * M_PI;
-
-            f += coef[l] * radial_at(n, m, r, rd) * std::pow(m, td) *
-                 (m == 0  ? td > 0 ? 0. : 1.
-                  : m < 0 ? std::sin(t)
-                          : std::cos(t));
+            f += coef[l] * radial_at(n, util::abs(m), r) *
+                 trig_buffer[static_cast<std::size_t>(m + order)];
         }
         return f;
     }
@@ -318,7 +288,7 @@ struct Series {
 
 #ifdef MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
 namespace Zernike {
-double radial_at(int n, int m, double r, std::size_t d) {
+double radial_at(int n, int m, double r) {
     constexpr auto radial_polynomial_count = 1 + basic_radial_cap();
     static auto zernike_radials =
         ([]<auto... l>(std::integer_sequence<int, l...>)
@@ -328,7 +298,7 @@ double radial_at(int n, int m, double r, std::size_t d) {
                                              basic_radial_index_m(l)>>()...};
         })(std::make_integer_sequence<int, radial_polynomial_count>{});
     return zernike_radials[static_cast<std::size_t>(basic_radial_index_l(n, m))]
-        ->drvt(d, r);
+        ->eval(r);
 }
 }  // namespace Zernike
 #endif

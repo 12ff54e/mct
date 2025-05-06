@@ -36,6 +36,7 @@ void Spdata::print(std::ostream& os) const {
     os << std::setw(18) << psi_for_output().back() << std::setw(18)
        << psi_for_output().back() << '\n';
 
+#ifndef MCT_ZERNIKE_SERIES_
     auto write_1d_coef = [&](const auto& f_1d, std::size_t idx,
                              double value_on_axis, bool singular) {
         double c0, c1, c2;
@@ -112,6 +113,7 @@ void Spdata::print(std::ostream& os) const {
                           i_1d == 4);
         }
     }
+#endif
 
     // TODO: ripple related
     os << std::setw(4) << 0 << std::setw(4) << 0 << '\n';

@@ -4,6 +4,9 @@
 
 #include "BSplineInterpolation/src/include/Mesh.hpp"
 
+#define ZQ_TIMER_IMPLEMENTATION
+#include "../lib/Timer.h"
+
 #define MCT_MAX_ZERNIKE_POLAR_ORDER 6
 #define MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
 #include "../lib/Zernike.h"
@@ -34,10 +37,13 @@ int main() {
                   FP_ZERO)
               << "] Derivative order larger than polynomial order test\n";
 
-    constexpr std::size_t nr = 128;
-    constexpr std::size_t nt = 128;
+    constexpr std::size_t nr = 256;
+    constexpr std::size_t nt = 256;
     intp::Mesh<double, 2> val(nr, nt);
     std::vector<double> rg(nr);
+
+    auto& timer = Timer::get_timer();
+    timer.start("Grid");
 
     constexpr double dr = 1. / static_cast<double>(nr);
     constexpr double dt = 2. * M_PI / static_cast<double>(nt);
@@ -53,20 +59,43 @@ int main() {
         }
     }
 
+    timer.pause_last_and_start_next("Series");
+
     constexpr int polar_order = 4;
     Zernike::Series<double> zernike_series(polar_order, nr, nt, val, rg);
 
+    timer.pause();
     std::cout << "\nCoefficients of f = 3*Z(0，0) + Z(2,0) - 1.5*Z(2,2) + "
                  "2*Z(5,-3)\n";
     int l = 0;
+
+    const int default_precision = static_cast<int>(std::cout.precision(2));
     for (auto c : zernike_series.coefficient()) {
-        std::cout << std::setw(9) << std::setprecision(2) << c << ", ";
+        std::cout << std::setw(9) << c << ", ";
         const auto [n, m] = Zernike::basic_index_nm(l, zernike_series.order);
         if (n == m || n + m == 2 * static_cast<int>(zernike_series.order)) {
             std::cout << '\n';
         }
         ++l;
     }
+    std::cout << std::setprecision(default_precision);
+
+    timer.start("Evaluate");
+
+    diff = 0;
+    for (std::size_t i = 0; i < nr; ++i) {
+        const auto r = rg[i];
+        for (std::size_t j = 0; j < nt; ++j) {
+            const double theta = dt * static_cast<double>(j);
+            diff += std::pow(val(i, j) - zernike_series(r, theta), 2);
+        }
+    }
+
+    timer.pause();
+    std::cout << "Grid Size: " << nr << " * " << nt << '\n'
+              << "L2 Difference on Grid: " << std::sqrt(diff / nr * nt) << '\n';
+
+    timer.print();
 
     return 0;
 }
