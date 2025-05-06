@@ -5,11 +5,11 @@
 #include "BSplineInterpolation/src/include/Mesh.hpp"
 
 #define ZQ_TIMER_IMPLEMENTATION
-#include "../lib/Timer.h"
+#include "Timer.h"
 
 #define MCT_MAX_ZERNIKE_POLAR_ORDER 6
 #define MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
-#include "../lib/Zernike.h"
+#include "Zernike.h"
 
 using zernike_radial_5_3 = Polynomial<0, 0, 0, -4, 0, 5>;
 using zernike_radial_5_3_d = Polynomial<0, 0, -12, 0, 25>;

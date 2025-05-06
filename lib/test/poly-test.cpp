@@ -1,4 +1,4 @@
-#include "../lib/Polynomial.h"
+#include "Polynomial.h"
 
 int main() {
     using P1 = Polynomial<1, 2>;

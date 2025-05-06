@@ -1,4 +1,4 @@
-#include "../lib/Vec.h"
+#include "Vec.h"
 #include <iomanip>
 #include "Assertion.hpp"
 

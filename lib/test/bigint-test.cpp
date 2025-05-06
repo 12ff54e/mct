@@ -1,7 +1,7 @@
 #include <iostream>
 
-#include "../lib/BigInt.h"
 #include "Assertion.hpp"
+#include "BigInt.h"
 
 int main() {
     Assertion assertion;

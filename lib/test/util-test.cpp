@@ -2,8 +2,8 @@
 #include <iostream>
 #include <limits>
 
-#include "../lib/util.h"
 #include "Assertion.hpp"
+#include "util.h"
 
 /**
  * @brief Find out if two float point number is approximately equal (diff up to

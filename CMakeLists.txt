@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.12.0)
 project(mct VERSION 0.2.0 LANGUAGES CXX)
-include(CTest)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebugInfo)
@@ -19,32 +18,12 @@ endif()
 
 include_directories(./deps)
 add_compile_definitions($<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:_DEBUG>)
-add_compile_definitions(MCT_ZERNIKE_SERIES_)
 
-add_executable(mct_exe src/main.cpp src/Spdata.cpp)
-set_property(TARGET mct_exe PROPERTY OUTPUT_NAME mct)
-target_include_directories(mct_exe PRIVATE ${PROJECT_SOURCE_DIR})
+add_subdirectory(lib)
 
-list(APPEND lib_src_files Contour.cpp GFileRawData.cpp MagneticEquilibrium.cpp)
-list(TRANSFORM lib_src_files PREPEND lib/)
-add_library(mct ${lib_src_files})
-target_link_libraries(mct_exe PUBLIC mct)
-
-list(APPEND tests vec-test util-test poly-test bigint-test zernike-test)
-list(LENGTH tests test_num)
-message(STATUS)
-message(STATUS  ${test_num} " tests found: ")
-enable_testing()
-foreach(test ${tests})
-    string(JOIN "" test_src_file test/ ${test} .cpp)
-    add_executable(${test} ${test_src_file})
-    target_include_directories(${test} PRIVATE ${PROJECT_SOURCE_DIR})
-
-    string(JOIN "-" test_name mct ${test})
-    add_test(${test_name} ${test})
-    message(STATUS ${test} " from source file " ${test_src_file})
-endforeach(test ${tests})
-message(STATUS)
+add_executable(mct src/main.cpp src/Spdata.cpp)
+target_include_directories(mct PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(mct PRIVATE meq)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
