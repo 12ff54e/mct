@@ -1,5 +1,5 @@
-#ifndef MCT_UTIL_
-#define MCT_UTIL_
+#ifndef MEQ_UTIL_H
+#define MEQ_UTIL_H
 
 #include <cmath>
 #include <iostream>
@@ -501,4 +501,4 @@ concept Indexed2D = requires(const T& arr, std::size_t i) { arr(i, i); };
 
 }  // namespace util
 
-#endif
+#endif  // MEQ_UTIL_H

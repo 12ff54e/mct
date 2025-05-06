@@ -1,5 +1,5 @@
-#ifndef MCT_POLYNOMIAL_H
-#define MCT_POLYNOMIAL_H
+#ifndef MEQ_POLYNOMIAL_H
+#define MEQ_POLYNOMIAL_H
 
 #include <algorithm>  //max
 #include <array>
@@ -278,4 +278,4 @@ struct poly_tail<Polynomial<c, cs...>> {
 template <typename P1, typename P2>
 using poly_mul = typename impl::poly_mul_impl<P1, P2>::type;
 
-#endif  // MCT_POLYNOMIAL_H
+#endif  // MEQ_POLYNOMIAL_H

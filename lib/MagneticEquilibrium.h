@@ -1,10 +1,10 @@
-#ifndef MCT_MAGNETIC_EQUILIBRIUM_
-#define MCT_MAGNETIC_EQUILIBRIUM_
+#ifndef MEQ_MAGNETIC_EQUILIBRIUM_H
+#define MEQ_MAGNETIC_EQUILIBRIUM_H
 
 #include "BSplineInterpolation/src/include/Interpolation.hpp"
 #include "GFileRawData.h"
 
-#ifdef MCT_ZERNIKE_SERIES_
+#ifdef MEQ_ZERNIKE_SERIES_
 #include "Zernike.h"
 #endif
 
@@ -47,7 +47,7 @@ class MagneticEquilibrium {
         // - r
         // - z
         // - jacobian
-#ifdef MCT_ZERNIKE_SERIES_
+#ifdef MEQ_ZERNIKE_SERIES_
         std::array<Zernike::Series<double>, FIELD_NUM_2D>
 #else
         std::array<intp::InterpolationFunction<double, 2, ORDER_OUT>,
@@ -122,7 +122,7 @@ class MagneticEquilibrium {
     MagneticEquilibriumRaw_ generate_boozer_coordinate_(const GFileRawData&,
                                                         std::size_t,
                                                         double);
-#ifdef MCT_ZERNIKE_SERIES_
+#ifdef MEQ_ZERNIKE_SERIES_
     Zernike::Series<double>
 #else
     intp::InterpolationFunction<double, 2, ORDER_OUT>
@@ -134,4 +134,4 @@ class MagneticEquilibrium {
         const std::vector<double>&) const;
 };
 
-#endif  // MCT_MAGNETIC_EQUILIBRIUM_
+#endif  // MEQ_MAGNETIC_EQUILIBRIUM_H

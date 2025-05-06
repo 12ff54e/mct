@@ -1,5 +1,5 @@
-#ifndef MCT_CONTOUR_
-#define MCT_CONTOUR_
+#ifndef MEQ_CONTOUR_H
+#define MEQ_CONTOUR_H
 
 #include <algorithm>
 #include <vector>
@@ -129,4 +129,4 @@ intp::InterpolationFunction1D<3, double> Contour::indefinite_integrate_along(
     return integral_interp;
 }
 
-#endif
+#endif  // MEQ_CONTOUR_H

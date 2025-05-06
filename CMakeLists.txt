@@ -16,7 +16,6 @@ else()
     set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 endif()
 
-include_directories(./deps)
 add_compile_definitions($<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:_DEBUG>)
 
 add_subdirectory(lib)
@@ -24,6 +23,9 @@ add_subdirectory(lib)
 add_executable(mct src/main.cpp src/Spdata.cpp)
 target_include_directories(mct PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(mct PRIVATE meq)
+
+target_compile_definitions(meq PRIVATE MEQ_ZERNIKE_SERIES_ MEQ_MAX_ZERNIKE_POLAR_ORDER=20)
+target_compile_definitions(mct PRIVATE MEQ_ZERNIKE_SERIES_)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})

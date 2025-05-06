@@ -6,8 +6,8 @@
 #include "MagneticEquilibrium.h"
 #include "Timer.h"
 
-#ifdef MCT_ZERNIKE_SERIES_
-#define MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
+#ifdef MEQ_ZERNIKE_SERIES_
+#define MEQ_ZERNIKE_POLYNOMIAL_INSTANTIATION
 #include "Zernike.h"
 #endif
 
@@ -308,7 +308,7 @@ MagneticEquilibrium::intp_data() const {
     return spdata_intp_;
 }
 
-#ifdef MCT_ZERNIKE_SERIES_
+#ifdef MEQ_ZERNIKE_SERIES_
 Zernike::Series<double>
 #else
 intp::InterpolationFunction<double, 2, MagneticEquilibrium::ORDER_OUT>
@@ -316,7 +316,7 @@ intp::InterpolationFunction<double, 2, MagneticEquilibrium::ORDER_OUT>
 MagneticEquilibrium::create_2d_spline_(
     const intp::Mesh<double, 2>& data,
     const std::vector<double>& psi_sample) const {
-#ifdef MCT_ZERNIKE_SERIES_
+#ifdef MEQ_ZERNIKE_SERIES_
     static_cast<void>(psi_sample);
     // The Zernike series is actually representing f(r, theta+delta/2)
 
@@ -325,7 +325,7 @@ MagneticEquilibrium::create_2d_spline_(
     for (auto& v : r) { v = std::sqrt(v / psi_w); }
 
     const auto zernike_order = static_cast<int>(
-        lst / 5 > MCT_MAX_ZERNIKE_POLAR_ORDER ? MCT_MAX_ZERNIKE_POLAR_ORDER
+        lst / 5 > MEQ_MAX_ZERNIKE_POLAR_ORDER ? MEQ_MAX_ZERNIKE_POLAR_ORDER
                                               : lst / 5);
     return {zernike_order, r.size(), lst, data, r};
 #else

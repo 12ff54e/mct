@@ -1,5 +1,5 @@
-#ifndef MCT_VEC_
-#define MCT_VEC_
+#ifndef MEQ_VEC_H
+#define MEQ_VEC_H
 
 #include <array>
 #include <cmath>

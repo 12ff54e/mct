@@ -1,10 +1,10 @@
-#ifndef ZERNIKE_H
-#define ZERNIKE_H
+#ifndef MEQ_ZERNIKE_H
+#define MEQ_ZERNIKE_H
 
 #include <cstdlib>  //std::size_t
 #include <memory>   // unique_ptr
 
-#ifdef MCT_DEBUG_
+#ifdef MEQ_DEBUG_
 #include <stdexcept>
 #endif
 
@@ -12,8 +12,8 @@
 #include "Polynomial.h"
 #include "util.h"
 
-#ifndef MCT_MAX_ZERNIKE_POLAR_ORDER
-#define MCT_MAX_ZERNIKE_POLAR_ORDER 20
+#ifndef MEQ_MAX_ZERNIKE_POLAR_ORDER
+#define MEQ_MAX_ZERNIKE_POLAR_ORDER 20
 #endif
 
 namespace Zernike {
@@ -106,32 +106,32 @@ constexpr std::pair<int, int> radial_index_nm(int l) {
 }
 
 // last index
-constexpr int basic_radial_cap(int mt = MCT_MAX_ZERNIKE_POLAR_ORDER) {
+constexpr int basic_radial_cap(int mt = MEQ_MAX_ZERNIKE_POLAR_ORDER) {
     return mt * (mt + 3) / 2;
 }
 
 constexpr int basic_radial_index_l(int n,
                                    int m,
-                                   int mt = MCT_MAX_ZERNIKE_POLAR_ORDER) {
+                                   int mt = MEQ_MAX_ZERNIKE_POLAR_ORDER) {
     return n <= mt ? radial_index_l(n, m)
                    : basic_radial_cap(mt) - radial_index_l(2 * mt - n, m);
 }
 
 constexpr int basic_radial_index_n(int l,
-                                   int mt = MCT_MAX_ZERNIKE_POLAR_ORDER) {
+                                   int mt = MEQ_MAX_ZERNIKE_POLAR_ORDER) {
     const auto t = basic_radial_cap(mt);
     return 2 * l < t ? radial_index_n(l) : 2 * mt - radial_index_n(t - l);
 }
 
 constexpr int basic_radial_index_m(int l,
-                                   int mt = MCT_MAX_ZERNIKE_POLAR_ORDER) {
+                                   int mt = MEQ_MAX_ZERNIKE_POLAR_ORDER) {
     const auto t = basic_radial_cap(mt);
     return 2 * l < t ? radial_index_m(l) : radial_index_m(t - l);
 }
 
 constexpr std::pair<int, int> basic_radial_index_nm(
     int l,
-    int mt = MCT_MAX_ZERNIKE_POLAR_ORDER) {
+    int mt = MEQ_MAX_ZERNIKE_POLAR_ORDER) {
     const auto t = basic_radial_cap(mt);
     return 2 * l < t ? radial_index_nm(l) : (([mt](auto p) -> decltype(p) {
         return {2 * mt - p.first, p.second};
@@ -161,7 +161,7 @@ struct Series {
     const int order;  // maximum polar order
     //  Maximum radial order = 2 * order
 
-    Series(int polar_order = MCT_MAX_ZERNIKE_POLAR_ORDER)
+    Series(int polar_order = MEQ_MAX_ZERNIKE_POLAR_ORDER)
         : order(polar_order), coef(basic_cap(polar_order) + 1) {}
     Series(int polar_order, std::vector<val_type> coefficients)
         : order(polar_order), coef{std::move(coefficients)} {
@@ -263,7 +263,7 @@ struct Series {
 
     val_type operator()(val_type r, val_type theta) const {
         val_type f{};
-        std::array<val_type, 2 * MCT_MAX_ZERNIKE_POLAR_ORDER + 1> trig_buffer;
+        std::array<val_type, 2 * MEQ_MAX_ZERNIKE_POLAR_ORDER + 1> trig_buffer;
         for (int i = 0; i <= 2 * order; ++i) {
             trig_buffer[static_cast<std::size_t>(i)] =
                 i < order ? std::sin((order - i) * theta)
@@ -286,7 +286,7 @@ struct Series {
 }  // namespace Zernike
 #endif  // ZERNIKE_H
 
-#ifdef MCT_ZERNIKE_POLYNOMIAL_INSTANTIATION
+#ifdef MEQ_ZERNIKE_POLYNOMIAL_INSTANTIATION
 namespace Zernike {
 double radial_at(int n, int m, double r) {
     constexpr auto radial_polynomial_count = 1 + basic_radial_cap();
@@ -301,4 +301,4 @@ double radial_at(int n, int m, double r) {
         ->eval(r);
 }
 }  // namespace Zernike
-#endif
+#endif  // MEQ_ZERNIKE_H

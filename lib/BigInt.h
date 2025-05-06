@@ -1,5 +1,5 @@
-#ifndef MCT_BIGINT_
-#define MCT_BIGINT_
+#ifndef MEQ_BIGINT_H
+#define MEQ_BIGINT_H
 
 #include "Polynomial.h"
 
@@ -295,4 +295,4 @@ using bigint_factorial_partial = BigInt<typename impl::poly_trim<
 template <typename B>
 using bigint_factorial = bigint_factorial_partial<B, to_bigint<0>>;
 
-#endif
+#endif  // MEQ_BIGINT_H
