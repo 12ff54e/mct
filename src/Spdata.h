@@ -1,6 +1,6 @@
 #include <ostream>
 
-#include "lib/MagneticEquilibrium.h"
+#include "MagneticEquilibrium.h"
 
 struct Spdata : MagneticEquilibrium {
     Spdata(const GFileRawData& g_file_data,
