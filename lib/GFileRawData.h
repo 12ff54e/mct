@@ -1,5 +1,5 @@
-#ifndef MCT_GFILE_RAW_DATA_
-#define MCT_GFILE_RAW_DATA_
+#ifndef MEQ_GFILE_RAW_DATA_H
+#define MEQ_GFILE_RAW_DATA_H
 
 #include <fstream>
 #include <string>
@@ -95,4 +95,4 @@ struct GFileRawData {
     bool complete_;
 };
 
-#endif
+#endif  // MEQ_GFILE_RAW_DATA_H

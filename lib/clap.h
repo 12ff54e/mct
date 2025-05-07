@@ -112,6 +112,7 @@ struct CLAP {
 
         switch (type_code) {
             TYPE_LIST()
+            case CLAP_TYPE_CODE::_help_t:
             default:
                 assert(0 && "Unreachable");
         }

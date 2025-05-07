@@ -1,8 +1,12 @@
-#ifndef MCT_MAGNETIC_EQUILIBRIUM_
-#define MCT_MAGNETIC_EQUILIBRIUM_
+#ifndef MEQ_MAGNETIC_EQUILIBRIUM_H
+#define MEQ_MAGNETIC_EQUILIBRIUM_H
 
 #include "BSplineInterpolation/src/include/Interpolation.hpp"
 #include "GFileRawData.h"
+
+#ifdef MEQ_ZERNIKE_SERIES_
+#include "Zernike.h"
+#endif
 
 class MagneticEquilibrium {
    public:
@@ -43,8 +47,12 @@ class MagneticEquilibrium {
         // - r
         // - z
         // - jacobian
+#ifdef MEQ_ZERNIKE_SERIES_
+        std::array<Zernike::Series<double>, FIELD_NUM_2D>
+#else
         std::array<intp::InterpolationFunction<double, 2, ORDER_OUT>,
                    FIELD_NUM_2D>
+#endif
             intp_2d;
         // - safety_factor
         // - poloidal_current
@@ -114,12 +122,16 @@ class MagneticEquilibrium {
     MagneticEquilibriumRaw_ generate_boozer_coordinate_(const GFileRawData&,
                                                         std::size_t,
                                                         double);
-    intp::InterpolationFunction<double, 2, ORDER_OUT> create_2d_spline_(
-        const intp::Mesh<double, 2>&,
-        const std::vector<double>&) const;
+#ifdef MEQ_ZERNIKE_SERIES_
+    Zernike::Series<double>
+#else
+    intp::InterpolationFunction<double, 2, ORDER_OUT>
+#endif
+    create_2d_spline_(const intp::Mesh<double, 2>&,
+                      const std::vector<double>&) const;
     intp::InterpolationFunction1D<ORDER_OUT, double> create_1d_spline_(
         const std::vector<double>&,
         const std::vector<double>&) const;
 };
 
-#endif  // MCT_MAGNETIC_EQUILIBRIUM_
+#endif  // MEQ_MAGNETIC_EQUILIBRIUM_H

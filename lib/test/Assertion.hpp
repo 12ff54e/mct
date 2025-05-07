@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <iostream>
 #include <string>
 
@@ -16,6 +17,11 @@ class Assertion {
     void operator()(bool t, std::string msg) {
         operator()(t);
         if (last_status() != 0) { std::cout << msg << '\n'; }
+    }
+    template <typename T>
+    void test(bool t, const T& msg) {
+        operator()(t);
+        std::cout << std::boolalpha << '[' << t << "] " << msg << '\n';
     }
     int last_status() const { return last_err; }
     int status() const { return err; }

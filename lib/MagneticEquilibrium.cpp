@@ -1,14 +1,28 @@
 #include <iomanip>
 #include <limits>
+#include <stdexcept>  // runtime_error
 
 #include "Contour.h"
 #include "MagneticEquilibrium.h"
+#include "Timer.h"
+
+#ifdef MEQ_ZERNIKE_SERIES_
+#define MEQ_ZERNIKE_POLYNOMIAL_INSTANTIATION
+#include "Zernike.h"
+#endif
 
 MagneticEquilibrium::MagneticEquilibriumRaw_
 MagneticEquilibrium::generate_boozer_coordinate_(
     const GFileRawData& g_file_data,
     std::size_t radial_sample,
     double psi_ratio) {
+    if (radial_sample % 2 != 0) {
+        throw std::runtime_error(
+            "[MagneticEquilibrium] Radial sample point must be even.");
+    }
+
+    auto& timer = Timer::get_timer();
+    timer.start("Create Boozer grid");
     intp::InterpolationFunction<double, 2u, ORDER> flux_function(
         g_file_data.flux,
         std::make_pair(g_file_data.r_left,
@@ -249,6 +263,8 @@ MagneticEquilibrium::generate_boozer_coordinate_(
         r_minor_n.push_back(r_geo_intp(0.) / R0 - 1.);
     }
 
+    timer.pause();
+
     // psi_delta_ is normalized after flux surface is fully constructed, and
     // should never be changed hereafter
     psi_delta_ /= flux_unit;
@@ -292,10 +308,27 @@ MagneticEquilibrium::intp_data() const {
     return spdata_intp_;
 }
 
+#ifdef MEQ_ZERNIKE_SERIES_
+Zernike::Series<double>
+#else
 intp::InterpolationFunction<double, 2, MagneticEquilibrium::ORDER_OUT>
+#endif
 MagneticEquilibrium::create_2d_spline_(
     const intp::Mesh<double, 2>& data,
     const std::vector<double>& psi_sample) const {
+#ifdef MEQ_ZERNIKE_SERIES_
+    static_cast<void>(psi_sample);
+    // The Zernike series is actually representing f(r, theta+delta/2)
+
+    std::vector<double> r(spdata_raw_.data_1d[5]);
+    const auto psi_w = r[r.size() - 1];
+    for (auto& v : r) { v = std::sqrt(v / psi_w); }
+
+    const auto zernike_order = static_cast<int>(
+        lst / 5 > MEQ_MAX_ZERNIKE_POLAR_ORDER ? MEQ_MAX_ZERNIKE_POLAR_ORDER
+                                              : lst / 5);
+    return {zernike_order, r.size(), lst, data, r};
+#else
     // interpolate the even-spaced data
     intp::InterpolationFunction<double, 2, ORDER_OUT> data_intp(
         {false, true}, data,
@@ -318,6 +351,7 @@ MagneticEquilibrium::create_2d_spline_(
         std::move(data_resampled),
         intp::util::get_range(psi_sample),
         std::make_pair(.5 * theta_delta_, 2. * M_PI + .5 * theta_delta_)};
+#endif
 }
 
 intp::InterpolationFunction1D<MagneticEquilibrium::ORDER_OUT, double>
