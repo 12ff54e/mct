@@ -2,12 +2,12 @@
 
 #include <iomanip>
 
-Spdata::Spdata(const GFileRawData& g_file_data,
+Spdata::Spdata(const GFileRawData<val_type>& g_file_data,
                std::size_t radial_grid_num,
                std::size_t poloidal_grid_num,
                bool use_si,
                std::size_t radial_sample,
-               double psi_ratio)
+               val_type psi_ratio)
     : MagneticEquilibrium(g_file_data,
                           radial_grid_num,
                           poloidal_grid_num,
@@ -16,14 +16,15 @@ Spdata::Spdata(const GFileRawData& g_file_data,
                           psi_ratio,
                           generate_psi_for_output_) {}
 
-std::vector<double> Spdata::generate_psi_for_output_(double psi_delta,
-                                                     std::size_t l) {
-    std::vector<double> psi(l);
+std::vector<Spdata::val_type> Spdata::generate_psi_for_output_(
+    val_type psi_delta,
+    std::size_t l) {
+    std::vector<val_type> psi(l);
     psi[0] = psi_delta;
     for (std::size_t i = 1; i < l - 1; ++i) {
-        psi[i] = psi_delta * (static_cast<double>(i) + .5);
+        psi[i] = psi_delta * (static_cast<val_type>(i) + .5);
     }
-    psi[l - 1] = static_cast<double>(l - 1) * psi_delta;
+    psi[l - 1] = static_cast<val_type>(l - 1) * psi_delta;
 
     return psi;
 }
@@ -38,45 +39,46 @@ void Spdata::print(std::ostream& os) const {
 
 #ifndef MEQ_ZERNIKE_SERIES_
     auto write_1d_coef = [&](const auto& f_1d, std::size_t idx,
-                             double value_on_axis, bool singular) {
-        double c0, c1, c2;
+                             val_type value_on_axis, bool singular) {
+        val_type c0, c1, c2;
         if (idx == 0) {
-            const double v1 = f_1d(psi_delta()) - value_on_axis;
-            const double v2 = f_1d.derivative(std::make_pair(psi_delta(), 1)) *
-                              (singular ? 2. * std::sqrt(psi_delta()) : 1.);
-            const double d = singular ? std::sqrt(psi_delta()) : psi_delta();
+            const val_type v1 = f_1d(psi_delta()) - value_on_axis;
+            const val_type v2 =
+                f_1d.derivative(std::make_pair(psi_delta(), 1)) *
+                (singular ? 2. * std::sqrt(psi_delta()) : 1.);
+            const val_type d = singular ? std::sqrt(psi_delta()) : psi_delta();
             c0 = value_on_axis;
             c1 = 2. * v1 / d - v2;
             c2 = (-v1 + v2 * d) / (d * d);
         } else {
-            const double psi = static_cast<double>(idx) * psi_delta();
+            const val_type psi = static_cast<val_type>(idx) * psi_delta();
             c0 = f_1d(psi);
             c1 = f_1d.derivative(std::make_pair(psi, 1));
-            c2 =
-                .5 * f_1d.derivative(std::make_pair(psi + .5 * psi_delta(), 2));
+            c2 = .5 * f_1d.derivative(std::make_pair(
+                          psi + static_cast<val_type>(.5 * psi_delta()), 2));
         }
         os << std::setw(18) << c0 << std::setw(18) << c1 << std::setw(18) << c2
            << '\n';
     };
 
     auto write_2d_coef = [&](auto& f_2d, std::size_t idx,
-                             double value_on_axis) {
+                             val_type value_on_axis) {
         for (size_t i = 0; i < 9; ++i) {
             size_t psi_order = i % 3;
             size_t theta_order = i / 3;
             for (size_t j = 0; j <= lst; ++j) {
-                double coef =
+                val_type coef =
                     (psi_order == 2 ? .5 : 1.) * (theta_order == 2 ? .5 : 1.);
-                const double theta =
-                    (static_cast<double>(j) + (theta_order == 2 ? .5 : 0.)) *
+                const val_type theta =
+                    (static_cast<val_type>(j) + (theta_order == 2 ? .5 : 0.)) *
                     theta_delta();
                 if (idx == 0) {
-                    const double v1 =
+                    const val_type v1 =
                         theta_order == 0
                             ? f_2d(psi_delta(), theta) - value_on_axis
                             : f_2d.derivative({psi_delta(), theta},
                                               {0, theta_order});
-                    const double v2 =
+                    const val_type v2 =
                         f_2d.derivative({psi_delta(), theta}, {1, theta_order});
 
                     coef = psi_order == 0
@@ -88,9 +90,9 @@ void Spdata::print(std::ostream& os) const {
                                           : -(v1 - 2. * v2 * psi_delta()) /
                                                 psi_delta());
                 } else {
-                    const double psi = (static_cast<double>(idx) +
-                                        (psi_order == 2 ? .5 : 0.)) *
-                                       psi_delta();
+                    const val_type psi = (static_cast<val_type>(idx) +
+                                          (psi_order == 2 ? .5 : 0.)) *
+                                         psi_delta();
                     coef = (i == 0 ? f_2d(psi, theta)
                                    : coef * f_2d.derivative(
                                                 {psi, theta},
@@ -143,11 +145,11 @@ std::tuple<std::size_t, std::size_t, std::size_t> SpdataLiteral::peek_dimension(
 
     std::size_t lsp, lst;
     int dump_int;
-    double dump_double;
+    val_type dump_float;
     is >> lsp >> lst >> dump_int >> dump_int;
-    is >> dump_double >> dump_double;
+    is >> dump_float >> dump_float;
 
-    for (std::size_t t = 0; t < lst; ++t) { is >> dump_double; }
+    for (std::size_t t = 0; t < lst; ++t) { is >> dump_float; }
     std::string line;
 
     // actually number of pts on flux surface, could be lst or lst+1
@@ -155,13 +157,13 @@ std::tuple<std::size_t, std::size_t, std::size_t> SpdataLiteral::peek_dimension(
     std::getline(is, line);
     {
         std::istringstream iss(line);
-        if ((iss >> dump_double)) {
+        if ((iss >> dump_float)) {
             theta_pts++;
         } else {
             std::getline(is, line);
             iss.clear();
             iss.str(line);
-            if (!(iss >> dump_double >> dump_double)) { theta_pts++; }
+            if (!(iss >> dump_float >> dump_float)) { theta_pts++; }
         }
     }
 
@@ -185,11 +187,11 @@ void SpdataLiteral::read_from(std::istream& is, std::size_t theta_pts) {
     is.ignore(max_val, '\n');
     is >> psi_wall >> psi_sep;
 
-    double dump_double;
+    val_type dump_float;
     auto read_2d_flux = [&](auto& field, auto psi) {
         for (std::size_t c = 0; c < 9; ++c) {
             for (std::size_t t = 0; t < lst; ++t) { is >> field(psi, c, t); }
-            if (theta_pts != lst) { is >> dump_double; }
+            if (theta_pts != lst) { is >> dump_float; }
         }
     };
 
@@ -250,11 +252,11 @@ void SpdataLiteral::print_to(std::ostream& os) const {
     os << std::setw(18) << 0. << std::setw(18) << 0. << '\n';
 }
 
-void SpdataLiteral::convert_to_SI(double b0, double r0) {
+void SpdataLiteral::convert_to_SI(val_type b0, val_type r0) {
     const auto psi_unit_inv = 1. / (r0 * r0 * b0);
     const auto psi_unit_2_inv = psi_unit_inv * psi_unit_inv;
 
-    auto convert_2d = [&](auto& field, double unit) {
+    auto convert_2d = [&](auto& field, val_type unit) {
         for (std::size_t psi = 0; psi < lsp; ++psi) {
             for (std::size_t c = 0; c < 9; ++c) {
                 for (std::size_t t = 0; t < lst; ++t) {
@@ -270,7 +272,7 @@ void SpdataLiteral::convert_to_SI(double b0, double r0) {
         }
     };
 
-    auto convert_1d = [&](auto& field, double unit, bool singular = false) {
+    auto convert_1d = [&](auto& field, val_type unit, bool singular = false) {
         for (std::size_t psi = 0; psi < lsp; ++psi) {
             for (std::size_t c = 0; c < 3; ++c) {
                 field(psi, c) *=

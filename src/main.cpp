@@ -3,13 +3,13 @@
 #include <fstream>
 #include <iomanip>
 
+#define ZQ_TIMER_IMPLEMENTATION
+#include "Timer.h"
+
 #include "Contour.h"
 #include "GFileRawData.h"
 #include "MagneticEquilibrium.h"
 #include "Spdata.h"
-
-#define ZQ_TIMER_IMPLEMENTATION
-#include "Timer.h"
 
 #include "clap.h"
 
@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
             return ENOENT;
         }
 
-        GFileRawData g_file_data;
+        GFileRawData<Spdata::val_type> g_file_data;
         g_file >> g_file_data;
         if (!g_file_data.is_complete()) { return EPERM; }
         g_file.close();
