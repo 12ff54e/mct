@@ -2,6 +2,7 @@
 
 #include "MagneticEquilibrium.h"
 
+// NOTE: the only location that decides the value type of everything
 struct Spdata : MagneticEquilibrium<double> {
     Spdata(const GFileRawData<val_type>& g_file_data,
            std::size_t radial_grid_num,

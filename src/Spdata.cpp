@@ -1,4 +1,5 @@
 #include "Spdata.h"
+#include <sstream>
 
 #include <iomanip>
 
@@ -29,40 +30,45 @@ std::vector<Spdata::val_type> Spdata::generate_psi_for_output_(
     return psi;
 }
 
-void Spdata::print(std::ostream& os) const {
+void Spdata::print(std::ostream& output_stream) const {
     // mesh grid info
-    os << std::setw(4) << lsp << std::setw(4) << lst << std::setw(4) << 4
-       << std::setw(4) << 8 << '\n';
-    os << std::scientific << std::uppercase << std::setprecision(10);
-    os << std::setw(18) << psi_for_output().back() << std::setw(18)
-       << psi_for_output().back() << '\n';
+    output_stream << std::setw(4) << lsp << std::setw(4) << lst << std::setw(4)
+                  << 4 << std::setw(4) << 8 << '\n';
+    output_stream << std::scientific << std::uppercase << std::setprecision(10);
+    output_stream << std::setw(18) << psi_for_output().back() << std::setw(18)
+                  << psi_for_output().back() << '\n';
+
+    auto& thread_pool = intp::DedicatedThreadPool<void>::get_instance();
+    std::vector<std::ostringstream> output_buffer(lsp);
 
 #ifndef MEQ_ZERNIKE_SERIES_
-    auto write_1d_coef = [&](const auto& f_1d, std::size_t idx,
+    auto write_1d_coef = [psi_delta = psi_delta()](
+                             auto& os, const auto& f_1d, std::size_t idx,
                              val_type value_on_axis, bool singular) {
         val_type c0, c1, c2;
         if (idx == 0) {
-            const val_type v1 = f_1d(psi_delta()) - value_on_axis;
-            const val_type v2 =
-                f_1d.derivative(std::make_pair(psi_delta(), 1)) *
-                (singular ? 2. * std::sqrt(psi_delta()) : 1.);
-            const val_type d = singular ? std::sqrt(psi_delta()) : psi_delta();
+            const val_type v1 = f_1d(psi_delta) - value_on_axis;
+            const val_type v2 = f_1d.derivative(std::make_pair(psi_delta, 1)) *
+                                (singular ? 2. * std::sqrt(psi_delta) : 1.);
+            const val_type d = singular ? std::sqrt(psi_delta) : psi_delta;
             c0 = value_on_axis;
             c1 = 2. * v1 / d - v2;
             c2 = (-v1 + v2 * d) / (d * d);
         } else {
-            const val_type psi = static_cast<val_type>(idx) * psi_delta();
+            const val_type psi = static_cast<val_type>(idx) * psi_delta;
             c0 = f_1d(psi);
             c1 = f_1d.derivative(std::make_pair(psi, 1));
             c2 = .5 * f_1d.derivative(std::make_pair(
-                          psi + static_cast<val_type>(.5 * psi_delta()), 2));
+                          psi + static_cast<val_type>(.5 * psi_delta), 2));
         }
-        os << std::setw(18) << c0 << std::setw(18) << c1 << std::setw(18) << c2
+        os << std::scientific << std::uppercase << std::setprecision(10)
+           << std::setw(18) << c0 << std::setw(18) << c1 << std::setw(18) << c2
            << '\n';
     };
 
-    auto write_2d_coef = [&](auto& f_2d, std::size_t idx,
+    auto write_2d_coef = [&](auto& os, auto& f_2d, std::size_t idx,
                              val_type value_on_axis) {
+        os << std::scientific << std::uppercase << std::setprecision(10);
         for (size_t i = 0; i < 9; ++i) {
             size_t psi_order = i % 3;
             size_t theta_order = i / 3;
@@ -106,22 +112,35 @@ void Spdata::print(std::ostream& os) const {
         }
     };
 
-    for (std::size_t ri = 0; ri < lsp; ++ri) {
-        for (std::size_t i_2d = 0; i_2d < FIELD_NUM_2D; ++i_2d) {
-            write_2d_coef(intp_data().intp_2d[i_2d], ri, axis_value_2d()[i_2d]);
-        }
-        for (std::size_t i_1d = 0; i_1d < FIELD_NUM_1D; ++i_1d) {
-            write_1d_coef(intp_data().intp_1d[i_1d], ri, axis_value_1d()[i_1d],
-                          i_1d == 4);
-        }
+    std::vector<std::future<void>> tasks;
+    constexpr std::size_t task_size = 2;
+    for (std::size_t ri = 0; ri < (lsp + task_size - 1) / task_size; ++ri) {
+        const auto start = ri * task_size;
+        const auto finish = start + task_size > lsp ? lsp : start + task_size;
+        auto write_to_buffer = [&, start, finish]() {
+            for (std::size_t i = start; i < finish; ++i) {
+                for (std::size_t i_2d = 0; i_2d < FIELD_NUM_2D; ++i_2d) {
+                    write_2d_coef(output_buffer[i], intp_data().intp_2d[i_2d],
+                                  i, axis_value_2d()[i_2d]);
+                }
+                for (std::size_t i_1d = 0; i_1d < FIELD_NUM_1D; ++i_1d) {
+                    write_1d_coef(output_buffer[i], intp_data().intp_1d[i_1d],
+                                  i, axis_value_1d()[i_1d], i_1d == 4);
+                }
+            }
+        };
+        tasks.push_back(thread_pool.queue_task(write_to_buffer));
     }
+
+    for (auto& res : tasks) { res.get(); }
+    for (auto& oss : output_buffer) { output_stream << oss.str(); }
 #endif
 
     // TODO: ripple related
-    os << std::setw(4) << 0 << std::setw(4) << 0 << '\n';
-    os << std::setw(18) << axis_value_2d()[1] << std::setw(18) << 0.
-       << std::setw(18) << 0. << '\n';
-    os << std::setw(18) << 0. << std::setw(18) << 0. << '\n';
+    output_stream << std::setw(4) << 0 << std::setw(4) << 0 << '\n';
+    output_stream << std::setw(18) << axis_value_2d()[1] << std::setw(18) << 0.
+                  << std::setw(18) << 0. << '\n';
+    output_stream << std::setw(18) << 0. << std::setw(18) << 0. << '\n';
 }
 
 SpdataLiteral::SpdataLiteral(std::size_t psi_num, std::size_t theta_num)
