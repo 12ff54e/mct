@@ -38,7 +38,6 @@ void Spdata::print(std::ostream& output_stream) const {
     output_stream << std::setw(18) << psi_for_output().back() << std::setw(18)
                   << psi_for_output().back() << '\n';
 
-    auto& thread_pool = intp::DedicatedThreadPool<void>::get_instance();
     std::vector<std::ostringstream> output_buffer(lsp);
 
 #ifndef MEQ_ZERNIKE_SERIES_
@@ -112,7 +111,10 @@ void Spdata::print(std::ostream& output_stream) const {
         }
     };
 
+#ifdef MCT_MULTITHREAD
+    auto& thread_pool = intp::DedicatedThreadPool<void>::get_instance();
     std::vector<std::future<void>> tasks;
+#endif
     constexpr std::size_t task_size = 2;
     for (std::size_t ri = 0; ri < (lsp + task_size - 1) / task_size; ++ri) {
         const auto start = ri * task_size;
@@ -129,12 +131,18 @@ void Spdata::print(std::ostream& output_stream) const {
                 }
             }
         };
+#ifdef MCT_MULTITHREAD
         tasks.push_back(thread_pool.queue_task(write_to_buffer));
+#else
+        write_to_buffer();
+#endif
     }
 
+#ifdef MCT_MULTITHREAD
     for (auto& res : tasks) { res.get(); }
-    for (auto& oss : output_buffer) { output_stream << oss.str(); }
 #endif
+    for (auto& oss : output_buffer) { output_stream << oss.str(); }
+#endif  // #ifndef MEQ_ZERNIKE_SERIES_
 
     // TODO: ripple related
     output_stream << std::setw(4) << 0 << std::setw(4) << 0 << '\n';
