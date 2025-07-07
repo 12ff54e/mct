@@ -1,3 +1,3 @@
 [submodule "libmeq"]
 	path = libmeq
-	url = https://github.com/12ff54e/libmeq
+	url = ../../12ff54e/libmeq
