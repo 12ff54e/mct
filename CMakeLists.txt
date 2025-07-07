@@ -28,10 +28,10 @@ if(NOT DEFINED MEQ_ENABLE_MULTITHREAD)
     set(MEQ_ENABLE_MULTITHREAD "${MCT_ENABLE_MULTITHREAD}" CACHE BOOL "Forwarded from MCT_ENABLE_MULTITHREAD to MEQ_ENABLE_MULTITHREAD" FORCE)
 endif()
 
-add_subdirectory(tmpmeq)
+add_subdirectory(libmeq)
 
 add_executable(mct src/main.cpp src/Spdata.cpp)
-target_include_directories(mct PRIVATE ${PROJECT_SOURCE_DIR}/tmpmeq)
+target_include_directories(mct PRIVATE ${PROJECT_SOURCE_DIR}/libmeq)
 target_link_libraries(mct PRIVATE meq)
 
 target_compile_definitions(mct PRIVATE $<$<BOOL:${MCT_ENABLE_MULTITHREAD}>:MCT_MULTITHREAD>)
