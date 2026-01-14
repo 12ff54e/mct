@@ -1,6 +1,6 @@
 # **M**agnetic **C**oordinate **T**ransformer
 
-Given poloidal magnetic flux $\psi_{p}$ (analytic or numeric), calculate its Boozer coordinate representation.
+Given ~poloidal magnetic flux (analytic or numeric)~ EFIT g-file, calculate its Boozer coordinate representation.
 
 ## Quick Start
 
