@@ -1,33 +1,129 @@
-#include "Spdata.h"
+#include <array>
+#include <iomanip>
 #include <sstream>
 
-#include <iomanip>
+#include "Spdata.h"
 
-Spdata::Spdata(const GFileRawData<val_type>& g_file_data,
+Spdata::Spdata(const GFileRawData<val_type>& gfile_data,
                std::size_t radial_grid_num,
                std::size_t poloidal_grid_num,
                bool use_si,
                std::size_t radial_sample,
                val_type psi_ratio)
-    : MagneticEquilibrium(g_file_data,
-                          radial_grid_num,
-                          poloidal_grid_num,
-                          use_si,
-                          radial_sample,
-                          psi_ratio,
-                          generate_psi_for_output_) {}
+    : lsp(radial_grid_num), lst(poloidal_grid_num) {
+    MagneticEquilibrium equilibrium(
+        gfile_data, radial_grid_num, poloidal_grid_num, radial_sample,
+        psi_ratio, use_si,
+        [](auto raw_values_1d) {
+            [[maybe_unused]] auto [psi, f, q, p, b2j] = raw_values_1d;
 
-std::vector<Spdata::val_type> Spdata::generate_psi_for_output_(
-    val_type psi_delta,
-    std::size_t l) {
-    std::vector<val_type> psi(l);
-    psi[0] = psi_delta;
-    for (std::size_t i = 1; i < l - 1; ++i) {
-        psi[i] = psi_delta * (static_cast<val_type>(i) + .5);
+            return std::array{psi, q, f, p};
+        },
+        [](auto raw_values_1d, auto raw_values_2d) {
+            [[maybe_unused]] auto [psi, f, q, p, b2j] = raw_values_1d;
+            [[maybe_unused]] auto [dpdr, dpdz, r, z] = raw_values_2d;
+
+            auto b2 = (f * f + dpdr * dpdr + dpdz * dpdz) / (r * r);
+            auto j = b2j / b2;
+            // B_p^2*J is used for calculating toroidal current
+            auto bp2j = (dpdr * dpdr + dpdz * dpdz) * j / (r * r);
+
+            return std::array{std::sqrt(b2), r, z, j, bp2j};
+        });
+
+    psi_delta_ = equilibrium.psi_delta();
+    theta_delta_ = equilibrium.theta_delta();
+    axis_value_1d_[0] = equilibrium.axis_value_1d(1);
+    axis_value_1d_[1] = equilibrium.axis_value_1d(2);
+    axis_value_1d_[2] = 0.;
+    axis_value_1d_[3] = equilibrium.axis_value_1d(3);
+    axis_value_1d_[4] = 0.;
+    axis_value_1d_[5] = 0.;
+    for (std::size_t i = 0; i < FIELD_NUM_2D; ++i) {
+        axis_value_2d_[i] = equilibrium.axis_value_2d(i);
     }
-    psi[l - 1] = static_cast<val_type>(l - 1) * psi_delta;
 
-    return psi;
+    const std::size_t eq_np = equilibrium.data_2d(0).dim_size(0);
+    const std::size_t eq_nt = equilibrium.data_2d(0).dim_size(1);
+    intp::InterpolationFunctionTemplate1D<ORDER, val_type, val_type>
+        poloidal_template(
+            std::make_pair(theta_delta(.5), 2. * M_PI + theta_delta(.5)), eq_nt,
+            true);
+    // calculate toroidal current
+    const auto& bp2j = equilibrium.data_2d(4);
+    std::vector<val_type> toroidal_current;
+    toroidal_current.reserve(eq_np);
+    for (std::size_t i = 0; i < eq_np; ++i) {
+        auto bp2j_func = poloidal_template.interpolate(
+            std::make_pair(bp2j.begin(1, {i, 0}), bp2j.end(1, {i, 0})));
+        val_type integration{};
+        for (std::size_t j = 0; j < eq_nt; ++j) {
+            integration += util::integrate_coarse(bp2j_func, theta_delta(j),
+                                                  theta_delta(j + 1));
+        }
+        toroidal_current.push_back(integration / (2. * M_PI));
+    }
+
+    // create 2d interpolation functions for output
+    for (std::size_t i = 0; i < FIELD_NUM_2D; ++i) {
+        intp_2d_[i] = create_2d_spline_(equilibrium.data_2d(i));
+    }
+
+    // minor_r is defined as R-R_0 at outer mid-plane and always normalized by
+    // R0
+    std::vector<val_type> minor_r;
+    minor_r.reserve(eq_np);
+    auto r0 = equilibrium.axis_value_2d(1);
+    for (std::size_t i = 0; i < eq_np; ++i) {
+        minor_r.push_back(intp_2d_[1](equilibrium.data_1d(0)[i], 0.) / r0 - 1.);
+    }
+
+    // create 1d interpolation functions for output
+    intp::InterpolationFunctionTemplate1D<ORDER, val_type, val_type>
+        radial_template(
+            std::make_pair(psi_for_output_().front(), psi_for_output_().back()),
+            eq_np);
+    intp::InterpolationFunctionTemplate1D<ORDER_OUT, val_type, val_type>
+        radial_template_for_output(intp::util::get_range(psi_for_output_()),
+                                   psi_for_output_().size());
+
+    std::vector<val_type> data_resampled;
+    data_resampled.reserve(psi_for_output_().size());
+
+    std::array<decltype(intp::util::get_range(equilibrium.data_1d(0))), 6>
+        data_1d_range;
+    data_1d_range[0] = intp::util::get_range(equilibrium.data_1d(1));
+    data_1d_range[1] = intp::util::get_range(equilibrium.data_1d(2));
+    data_1d_range[2] = intp::util::get_range(std::as_const(toroidal_current));
+    data_1d_range[3] = intp::util::get_range(equilibrium.data_1d(3));
+    data_1d_range[4] = intp::util::get_range(std::as_const(minor_r));
+    // use as_const since equilibrium.data_1d() returns const auto&
+
+    std::vector<val_type> psi_t;
+    psi_t.reserve(eq_np);
+    // trapezoidal 1st segment
+    psi_t.push_back(psi_delta(
+        .5 * (equilibrium.axis_value_1d(1) + equilibrium.data_1d(1).front())));
+
+    for (std::size_t i = 0; i < FIELD_NUM_1D; ++i) {
+        data_resampled.clear();
+        auto data_intp = radial_template.interpolate(data_1d_range[i]);
+        for (const auto& psi : psi_for_output_()) {
+            data_resampled.push_back(data_intp(psi));
+        }
+        intp_1d_[i] = radial_template_for_output.interpolate(
+            intp::util::get_range(data_resampled));
+        // i==0 is safety factor, and from its integration we have psi_t
+        if (i == 0) {
+            for (std::size_t j = 0; j < eq_np - 1; ++j) {
+                psi_t.push_back(
+                    psi_t.back() +
+                    util::integrate_coarse(data_intp, equilibrium.data_1d(0)[j],
+                                           equilibrium.data_1d(0)[j + 1]));
+            }
+            data_1d_range[5] = intp::util::get_range(std::as_const(psi_t));
+        }
+    }
 }
 
 void Spdata::print(std::ostream& output_stream) const {
@@ -35,12 +131,11 @@ void Spdata::print(std::ostream& output_stream) const {
     output_stream << std::setw(4) << lsp << std::setw(4) << lst << std::setw(4)
                   << 4 << std::setw(4) << 8 << '\n';
     output_stream << std::scientific << std::uppercase << std::setprecision(10);
-    output_stream << std::setw(18) << psi_for_output().back() << std::setw(18)
-                  << psi_for_output().back() << '\n';
+    output_stream << std::setw(18) << psi_for_output_().back() << std::setw(18)
+                  << psi_for_output_().back() << '\n';
 
     std::vector<std::ostringstream> output_buffer(lsp);
 
-#ifndef MEQ_ZERNIKE_SERIES_
     auto write_1d_coef = [psi_delta = psi_delta()](
                              auto& os, const auto& f_1d, std::size_t idx,
                              val_type value_on_axis, bool singular) {
@@ -122,12 +217,12 @@ void Spdata::print(std::ostream& output_stream) const {
         auto write_to_buffer = [&, start, finish]() {
             for (std::size_t i = start; i < finish; ++i) {
                 for (std::size_t i_2d = 0; i_2d < FIELD_NUM_2D; ++i_2d) {
-                    write_2d_coef(output_buffer[i], intp_data().intp_2d[i_2d],
-                                  i, axis_value_2d()[i_2d]);
+                    write_2d_coef(output_buffer[i], intp_2d_[i_2d], i,
+                                  axis_value_2d_[i_2d]);
                 }
                 for (std::size_t i_1d = 0; i_1d < FIELD_NUM_1D; ++i_1d) {
-                    write_1d_coef(output_buffer[i], intp_data().intp_1d[i_1d],
-                                  i, axis_value_1d()[i_1d], i_1d == 4);
+                    write_1d_coef(output_buffer[i], intp_1d_[i_1d], i,
+                                  axis_value_1d_[i_1d], i_1d == 4);
                 }
             }
         };
@@ -142,13 +237,59 @@ void Spdata::print(std::ostream& output_stream) const {
     for (auto& res : tasks) { res.get(); }
 #endif
     for (auto& oss : output_buffer) { output_stream << oss.str(); }
-#endif  // #ifndef MEQ_ZERNIKE_SERIES_
 
     // TODO: ripple related
     output_stream << std::setw(4) << 0 << std::setw(4) << 0 << '\n';
-    output_stream << std::setw(18) << axis_value_2d()[1] << std::setw(18) << 0.
+    output_stream << std::setw(18) << axis_value_2d_[1] << std::setw(18) << 0.
                   << std::setw(18) << 0. << '\n';
     output_stream << std::setw(18) << 0. << std::setw(18) << 0. << '\n';
+}
+
+Spdata::val_type Spdata::psi_delta(val_type coef) const {
+    return psi_delta_ * coef;
+}
+Spdata::val_type Spdata::theta_delta(val_type coef) const {
+    return theta_delta_ * coef;
+}
+
+const std::vector<Spdata::val_type>& Spdata::psi_for_output_() const {
+    static std::vector<val_type> psi{([&]() {
+        std::vector<val_type> p(lsp);
+        p[0] = psi_delta();
+        for (std::size_t i = 1; i < lsp - 1; ++i) {
+            p[i] = psi_delta(static_cast<val_type>(i) + .5);
+        }
+        p[lsp - 1] = psi_delta(static_cast<val_type>(lsp - 1));
+        return p;
+    })()};
+    return psi;
+}
+
+intp::InterpolationFunction<Spdata::val_type,
+                            2,
+                            Spdata::ORDER_OUT,
+                            Spdata::val_type>
+Spdata::create_2d_spline_(const intp::Mesh<val_type, 2>& data) const {
+    // interpolate the even-spaced data
+    intp::InterpolationFunction<val_type, 2, ORDER_OUT, val_type> data_intp(
+        {false, true}, data,
+        std::make_pair(psi_for_output_().front(), psi_for_output_().back()),
+        std::make_pair(theta_delta(.5), 2. * M_PI + theta_delta(.5)));
+
+    // resample on the interpolated function
+    intp::Mesh<val_type, 2> data_resampled(lsp, lst + 1);
+    for (std::size_t i = 0; i < lsp; ++i) {
+        for (std::size_t j = 0; j <= lst; ++j) {
+            data_resampled(i, j) =
+                data_intp(psi_for_output_()[i],
+                          theta_delta(static_cast<val_type>(j) + .5));
+        }
+    }
+    // construct the interpolation function for output
+    return {{false, true},
+            std::move(data_resampled),
+            intp::util::get_range(psi_for_output_()),
+            std::make_pair(theta_delta(.5), 2. * M_PI + theta_delta(.5))};
 }
 
 SpdataLiteral::SpdataLiteral(std::size_t psi_num, std::size_t theta_num)
