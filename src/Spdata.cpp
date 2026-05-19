@@ -136,24 +136,23 @@ void Spdata::print(std::ostream& output_stream) const {
 
     std::vector<std::ostringstream> output_buffer(lsp);
 
-    auto write_1d_coef = [psi_delta = psi_delta()](
-                             auto& os, const auto& f_1d, std::size_t idx,
+    auto write_1d_coef = [&](auto& os, const auto& f_1d, std::size_t idx,
                              val_type value_on_axis, bool singular) {
         val_type c0, c1, c2;
         if (idx == 0) {
-            const val_type v1 = f_1d(psi_delta) - value_on_axis;
-            const val_type v2 = f_1d.derivative(std::make_pair(psi_delta, 1)) *
-                                (singular ? 2. * std::sqrt(psi_delta) : 1.);
-            const val_type d = singular ? std::sqrt(psi_delta) : psi_delta;
+            const val_type v1 = f_1d(psi_delta()) - value_on_axis;
+            const val_type v2 =
+                f_1d.derivative(std::make_pair(psi_delta(), 1)) *
+                (singular ? 2. * std::sqrt(psi_delta()) : 1.);
+            const val_type d = singular ? std::sqrt(psi_delta()) : psi_delta();
             c0 = value_on_axis;
             c1 = 2. * v1 / d - v2;
             c2 = (-v1 + v2 * d) / (d * d);
         } else {
-            const val_type psi = static_cast<val_type>(idx) * psi_delta;
+            const val_type psi = psi_delta(static_cast<val_type>(idx));
             c0 = f_1d(psi);
             c1 = f_1d.derivative(std::make_pair(psi, 1));
-            c2 = .5 * f_1d.derivative(std::make_pair(
-                          psi + static_cast<val_type>(.5 * psi_delta), 2));
+            c2 = .5 * f_1d.derivative(std::make_pair(psi + psi_delta(.5), 2));
         }
         os << std::scientific << std::uppercase << std::setprecision(10)
            << std::setw(18) << c0 << std::setw(18) << c1 << std::setw(18) << c2
@@ -169,9 +168,8 @@ void Spdata::print(std::ostream& output_stream) const {
             for (size_t j = 0; j <= lst; ++j) {
                 val_type coef =
                     (psi_order == 2 ? .5 : 1.) * (theta_order == 2 ? .5 : 1.);
-                const val_type theta =
-                    (static_cast<val_type>(j) + (theta_order == 2 ? .5 : 0.)) *
-                    theta_delta();
+                const val_type theta = theta_delta(
+                    static_cast<val_type>(j) + (theta_order == 2 ? .5 : 0.));
                 if (idx == 0) {
                     const val_type v1 =
                         theta_order == 0
@@ -181,18 +179,17 @@ void Spdata::print(std::ostream& output_stream) const {
                     const val_type v2 =
                         f_2d.derivative({psi_delta(), theta}, {1, theta_order});
 
-                    coef = psi_order == 0
-                               ? theta_order == 0 ? value_on_axis : 0.
-                               : 2. * coef *
-                                     (psi_order == 1
-                                          ? (v1 - v2 * psi_delta()) /
-                                                std::sqrt(psi_delta())
-                                          : -(v1 - 2. * v2 * psi_delta()) /
-                                                psi_delta());
+                    coef =
+                        psi_order == 0
+                            ? theta_order == 0 ? value_on_axis : 0.
+                            : 2. * coef *
+                                  (psi_order == 1 ? (v1 - psi_delta(v2)) /
+                                                        std::sqrt(psi_delta())
+                                                  : -(v1 - psi_delta(2. * v2)) /
+                                                        psi_delta());
                 } else {
-                    const val_type psi = (static_cast<val_type>(idx) +
-                                          (psi_order == 2 ? .5 : 0.)) *
-                                         psi_delta();
+                    const val_type psi = psi_delta(static_cast<val_type>(idx) +
+                                                   (psi_order == 2 ? .5 : 0.));
                     coef = (i == 0 ? f_2d(psi, theta)
                                    : coef * f_2d.derivative(
                                                 {psi, theta},
