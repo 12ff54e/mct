@@ -30,6 +30,11 @@ struct Input {
 };
 
 int main(int argc, char** argv) {
+    constexpr std::size_t default_radial_grid_count = 129;
+    constexpr std::size_t default_poloidal_grid_count = 255;
+    constexpr double default_psi_ratio = .99;
+
+    using namespace std::string_literals;
     CLAP_BEGIN(Input)
     CLAP_ADD_USAGE("[OPTION]... INPUT_FILE")
     CLAP_ADD_DESCRIPTION("Transfrom g-file to spdata using in GTC.")
@@ -37,16 +42,21 @@ int main(int argc, char** argv) {
     CLAP_REGISTER_OPTION_WITH_DESCRIPTION(
         output_path, "--output-path", "-o",
         "specify the path of output file, default to '$PWD/spdata.dat'")
-    CLAP_REGISTER_OPTION_WITH_DESCRIPTION(radial_grid_count, "--radial", "-r",
-                                          "radial grid number")
-    CLAP_REGISTER_OPTION_WITH_DESCRIPTION(poloidal_grid_count, "--poloidal",
-                                          "-p", "poloidal grid number")
+    CLAP_REGISTER_OPTION_WITH_DESCRIPTION(
+        radial_grid_count, "--radial", "-r",
+        "radial grid number, default to be "s +
+            std::to_string(default_radial_grid_count))
+    CLAP_REGISTER_OPTION_WITH_DESCRIPTION(
+        poloidal_grid_count, "--poloidal", "-p",
+        "poloidal grid number, default to be "s +
+            std::to_string(default_poloidal_grid_count))
     CLAP_REGISTER_OPTION_WITH_DESCRIPTION(
         use_SI, "--use-si",
         "output with SI unit instead of normalized to B_0 and R_0")
     CLAP_REGISTER_OPTION_WITH_DESCRIPTION(
         psi_ratio, "--psi-ratio",
-        "ratio of psiw in output to that given in gfile, default to be 0.99")
+        "ratio of psiw in output to that given in gfile, default to be "s +
+            std::to_string(default_psi_ratio))
     CLAP_REGISTER_OPTION_WITH_DESCRIPTION(
         input_type, "--input-type", "-t",
         "Input file type, could be either gfile or spdata, default to gfile")
@@ -58,9 +68,9 @@ int main(int argc, char** argv) {
 
     Input config;
     config.use_SI = false;
-    config.radial_grid_count = 129;
-    config.poloidal_grid_count = 255;
-    config.psi_ratio = 0.99;
+    config.radial_grid_count = default_radial_grid_count;
+    config.poloidal_grid_count = default_poloidal_grid_count;
+    config.psi_ratio = default_psi_ratio;
     config.input_type = "gfile";
     config.b0 = 1.;
     config.r0 = 1.;
