@@ -32,6 +32,7 @@ add_subdirectory(libmeq)
 
 add_executable(mct src/main.cpp src/Spdata.cpp)
 target_include_directories(mct PRIVATE ${PROJECT_SOURCE_DIR}/libmeq)
+target_include_directories(mct PRIVATE ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(mct PRIVATE meq)
 
 target_compile_definitions(mct PRIVATE $<$<BOOL:${MCT_ENABLE_MULTITHREAD}>:MCT_MULTITHREAD>)
