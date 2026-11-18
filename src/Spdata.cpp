@@ -57,7 +57,8 @@ Spdata::Spdata(const GFileRawData<val_type>& gfile_data,
         auto bp2j_func = poloidal_template.interpolate(
             std::make_pair(bp2j.begin(1, {i, 0}), bp2j.end(1, {i, 0})));
         val_type integration{};
-        for (std::size_t j = 0; j < eq_nt; ++j) {
+        // The grid repeats the first point after its lst angular intervals.
+        for (std::size_t j = 0; j < lst; ++j) {
             integration += util::integrate_coarse(bp2j_func, theta_delta(j),
                                                   theta_delta(j + 1));
         }
